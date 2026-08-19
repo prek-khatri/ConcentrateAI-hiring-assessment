@@ -13,9 +13,12 @@ export default function AssignmentDetailPage() {
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  function load() {
+  // keepData=true refreshes in place (e.g. after a submit) without flashing "Loading…".
+  function load(keepData = false) {
     setError(null);
-    setData(null);
+    if (!keepData) {
+      setData(null);
+    }
     studentApi
       .getAssignment(params.id)
       .then((res) => {
@@ -25,7 +28,9 @@ export default function AssignmentDetailPage() {
       .catch((err) => setError(err instanceof ApiClientError ? err.message : "Failed to load assignment."));
   }
 
-  useEffect(load, [params.id]);
+  useEffect(() => {
+    load();
+  }, [params.id]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -41,7 +46,7 @@ export default function AssignmentDetailPage() {
       } else {
         await studentApi.submit(params.id, content);
       }
-      load();
+      load(true);
     } catch (err) {
       setFormError(err instanceof ApiClientError ? err.message : "Failed to submit.");
     } finally {
@@ -53,7 +58,7 @@ export default function AssignmentDetailPage() {
     return (
       <main className="p-6">
         <p role="alert">
-          {error} <button onClick={load}>Retry</button>
+          {error} <button onClick={() => load()}>Retry</button>
         </p>
       </main>
     );
@@ -85,25 +90,39 @@ export default function AssignmentDetailPage() {
           <p className="text-sm">{submission!.feedback}</p>
         </section>
       ) : (
-        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            Submission
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={6}
-              className="rounded border px-3 py-2"
-            />
-          </label>
-          {formError ? (
-            <p role="alert" className="text-sm text-red-600">
-              {formError}
+        <>
+          {submission ? (
+            <p
+              role="status"
+              className="mt-6 rounded border border-green-600 bg-green-50 px-3 py-2 text-sm text-green-700"
+            >
+              ✓ Submitted on {new Date(submission.submitted_at).toLocaleString()} — you can still update it below.
             </p>
           ) : null}
-          <button type="submit" disabled={pending} className="rounded bg-black px-3 py-2 text-white disabled:opacity-50">
-            {pending ? "Submitting..." : submission ? "Update Submission" : "Submit Assignment"}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
+            <label className="flex flex-col gap-1 text-sm">
+              Submission
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={6}
+                className="rounded border px-3 py-2"
+              />
+            </label>
+            {formError ? (
+              <p role="alert" className="text-sm text-red-600">
+                {formError}
+              </p>
+            ) : null}
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
+            >
+              {pending ? "Submitting..." : submission ? "Update Submission" : "Submit Assignment"}
+            </button>
+          </form>
+        </>
       )}
     </main>
   );
