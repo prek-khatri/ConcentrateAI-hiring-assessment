@@ -1,6 +1,7 @@
 import type { Kysely } from "kysely";
 import type { DB } from "../db/schema.js";
 import { env } from "../env.js";
+import { ApiError } from "../errors.js";
 import { createStudentService } from "./student.service.js";
 import type { AuthedUser } from "../auth/middleware.js";
 
@@ -48,7 +49,7 @@ export async function buildContextForUser(db: Kysely<DB>, user: AuthedUser): Pro
 
 export async function askChatbot(context: string, message: string): Promise<string> {
   if (!env.GROQ_API_KEY) {
-    throw new Error("Chatbot is not configured — set GROQ_API_KEY");
+    throw new ApiError("NOT_CONFIGURED", "The chatbot is not configured for this environment.");
   }
 
   const res = await fetch(GROQ_CHAT_URL, {

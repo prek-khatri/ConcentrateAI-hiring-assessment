@@ -1,5 +1,6 @@
 import { Google, generateCodeVerifier, generateState } from "arctic";
 import { env } from "../env.js";
+import { ApiError } from "../errors.js";
 
 export type GoogleProfile = {
   sub: string;
@@ -10,7 +11,7 @@ export type GoogleProfile = {
 
 function getGoogleClient(): Google {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_CALLBACK_URL) {
-    throw new Error("Google OAuth is not configured — set GOOGLE_CLIENT_ID/SECRET/CALLBACK_URL");
+    throw new ApiError("NOT_CONFIGURED", "Google sign-in is not configured for this environment.");
   }
   return new Google(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, env.GOOGLE_CALLBACK_URL);
 }

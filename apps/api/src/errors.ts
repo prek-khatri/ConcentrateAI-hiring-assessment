@@ -4,6 +4,7 @@ export type ErrorCode =
   | "NOT_FOUND"
   | "VALIDATION_ERROR"
   | "CONFLICT"
+  | "NOT_CONFIGURED"
   | "INTERNAL_ERROR";
 
 const STATUS_BY_CODE: Record<ErrorCode, number> = {
@@ -12,6 +13,7 @@ const STATUS_BY_CODE: Record<ErrorCode, number> = {
   NOT_FOUND: 404,
   VALIDATION_ERROR: 400,
   CONFLICT: 409,
+  NOT_CONFIGURED: 503,
   INTERNAL_ERROR: 500,
 };
 
