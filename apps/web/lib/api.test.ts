@@ -35,12 +35,21 @@ describe("apiFetch", () => {
     expect((err as ApiClientError).code).toBe("INTERNAL_ERROR");
   });
 
-  it("sends credentials and JSON content-type by default", async () => {
+  it("sends credentials, and a JSON content-type when there's a body", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
     vi.stubGlobal("fetch", fetchMock);
-    await apiFetch("/api/classes");
+    await apiFetch("/api/classes", { method: "POST", body: JSON.stringify({ name: "Bio" }) });
     const [, options] = fetchMock.mock.calls[0];
     expect(options.credentials).toBe("include");
     expect(options.headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("omits content-type on a bodyless request (avoids an empty-JSON-body parse error)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204, json: async () => ({}) });
+    vi.stubGlobal("fetch", fetchMock);
+    await apiFetch("/api/classes/1", { method: "DELETE" });
+    const [, options] = fetchMock.mock.calls[0];
+    expect(options.credentials).toBe("include");
+    expect(options.headers["Content-Type"]).toBeUndefined();
   });
 });

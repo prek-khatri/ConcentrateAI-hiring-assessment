@@ -12,7 +12,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...options.headers },
+    headers: { ...(options.body ? { "Content-Type": "application/json" } : {}), ...options.headers },
   });
 
   if (res.status === 204) {
