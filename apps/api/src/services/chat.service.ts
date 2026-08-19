@@ -54,7 +54,7 @@ export async function askChatbot(context: string, message: string): Promise<stri
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
+      model: "openai/gpt-oss-20b",
       max_tokens: 300,
       messages: [
         { role: "system", content: `${SYSTEM_PROMPT}\n\nContext:\n${context}` },
