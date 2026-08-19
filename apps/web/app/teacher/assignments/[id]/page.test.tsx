@@ -306,7 +306,7 @@ describe("AssignmentDetailPage", () => {
   });
 
   it("shows a generic error when saving throws a non-API error", async () => {
-    const fetchMock = vi.fn((url: string, opts: RequestInit = {}) => {
+    const fetchMock = vi.fn((_url: string, opts: RequestInit = {}) => {
       if (opts.method === "PATCH") return Promise.reject(new Error("network down"));
       return Promise.resolve(jsonResponse(200, { assignment: baseAssignment, submissions: [] }));
     });
@@ -376,7 +376,7 @@ describe("AssignmentDetailPage", () => {
 
   it("shows a generic error when deleting throws a non-API error", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    const fetchMock = vi.fn((url: string, opts: RequestInit = {}) => {
+    const fetchMock = vi.fn((_url: string, opts: RequestInit = {}) => {
       if (opts.method === "DELETE") return Promise.reject(new Error("network down"));
       return Promise.resolve(jsonResponse(200, { assignment: baseAssignment, submissions: [] }));
     });

@@ -44,7 +44,7 @@ NEXT_PUBLIC_API_URL=https://api.your-domain.com
 # optional — leave blank to skip
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_CALLBACK_URL=https://api.your-domain.com/auth/oauth/google/callback
+GOOGLE_CALLBACK_URL=https://api.your-domain.com/auth/google/callback
 GROQ_API_KEY=
 ```
 
