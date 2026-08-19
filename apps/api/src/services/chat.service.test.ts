@@ -145,12 +145,141 @@ describe("buildContextForUser", () => {
 
   it("returns a minimal honest context for roles without wired-up data yet", async () => {
     const context = await buildContextForUser(db, {
-      id: "teacher-id",
-      email: "teacher@example.com",
-      name: "Terry Teacher",
-      role: "teacher",
+      id: "admin-id",
+      email: "admin@example.com",
+      name: "Ada Admin",
+      role: "admin",
     });
     expect(context).toContain("No further context is available yet");
+  });
+
+  it("says a teacher with no classes has none yet", async () => {
+    const teacher2 = await db
+      .selectFrom("users")
+      .selectAll()
+      .where("email", "=", "teacher2@example.com")
+      .executeTakeFirstOrThrow();
+
+    const context = await buildContextForUser(db, {
+      id: teacher2.id,
+      email: teacher2.email,
+      name: teacher2.name,
+      role: "teacher",
+    });
+    expect(context).toMatch(/no classes yet/i);
+  });
+
+  it("builds a teacher context with roster, submission counts, and average score", async () => {
+    const teacher2 = await db.selectFrom("users").selectAll().where("email", "=", "teacher2@example.com").executeTakeFirstOrThrow();
+    const student = await db.selectFrom("users").selectAll().where("email", "=", "student@example.com").executeTakeFirstOrThrow();
+    const student2 = await db.selectFrom("users").selectAll().where("email", "=", "student2@example.com").executeTakeFirstOrThrow();
+
+    const tempClass = await db
+      .insertInto("classes")
+      .values({ name: "Chat Context Chemistry", teacher_id: teacher2.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await db
+      .insertInto("class_students")
+      .values([
+        { class_id: tempClass.id, student_id: student.id },
+        { class_id: tempClass.id, student_id: student2.id },
+      ])
+      .execute();
+    const gradedAssignment = await db
+      .insertInto("assignments")
+      .values({ class_id: tempClass.id, title: "Titration Lab", published: true, due_at: null })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const draftAssignment = await db
+      .insertInto("assignments")
+      .values({ class_id: tempClass.id, title: "Unpublished Draft", published: false, due_at: null })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const submission = await db
+      .insertInto("submissions")
+      .values({ assignment_id: gradedAssignment.id, student_id: student.id, content: "answer" })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await db
+      .insertInto("grades")
+      .values({ submission_id: submission.id, score: 88, graded_by: teacher2.id })
+      .execute();
+
+    const context = await buildContextForUser(db, {
+      id: teacher2.id,
+      email: teacher2.email,
+      name: teacher2.name,
+      role: "teacher",
+    });
+
+    expect(context).toContain("Chat Context Chemistry");
+    expect(context).toMatch(/2 students enrolled/i);
+    expect(context).toMatch(/"Titration Lab".*1\/2 submitted.*average score 88\/100/i);
+    expect(context).toMatch(/not yet submitted:.*sasha student/i);
+    expect(context).toMatch(/"Unpublished Draft" \(draft\).*0\/2 submitted.*no grades yet/i);
+
+    await db.deleteFrom("grades").where("submission_id", "=", submission.id).execute();
+    await db.deleteFrom("submissions").where("id", "=", submission.id).execute();
+    await db.deleteFrom("assignments").where("id", "in", [gradedAssignment.id, draftAssignment.id]).execute();
+    await db.deleteFrom("class_students").where("class_id", "=", tempClass.id).execute();
+    await db.deleteFrom("classes").where("id", "=", tempClass.id).execute();
+  });
+
+  it("reports an empty class as having no students and no assignments yet", async () => {
+    const teacher2 = await db.selectFrom("users").selectAll().where("email", "=", "teacher2@example.com").executeTakeFirstOrThrow();
+
+    const tempClass = await db
+      .insertInto("classes")
+      .values({ name: "Chat Context Empty Class", teacher_id: teacher2.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    const context = await buildContextForUser(db, {
+      id: teacher2.id,
+      email: teacher2.email,
+      name: teacher2.name,
+      role: "teacher",
+    });
+    expect(context).toMatch(/chat context empty class: no students enrolled/i);
+    expect(context).toMatch(/no assignments yet/i);
+
+    await db.deleteFrom("classes").where("id", "=", tempClass.id).execute();
+  });
+
+  it("reports an assignment with a submission still awaiting grading", async () => {
+    const teacher2 = await db.selectFrom("users").selectAll().where("email", "=", "teacher2@example.com").executeTakeFirstOrThrow();
+    const student3 = await db.selectFrom("users").selectAll().where("email", "=", "student3@example.com").executeTakeFirstOrThrow();
+
+    const tempClass = await db
+      .insertInto("classes")
+      .values({ name: "Chat Context Physics", teacher_id: teacher2.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    await db.insertInto("class_students").values({ class_id: tempClass.id, student_id: student3.id }).execute();
+    const assignment = await db
+      .insertInto("assignments")
+      .values({ class_id: tempClass.id, title: "Ungraded Quiz", published: true, due_at: null })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const submission = await db
+      .insertInto("submissions")
+      .values({ assignment_id: assignment.id, student_id: student3.id, content: "answer" })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    const context = await buildContextForUser(db, {
+      id: teacher2.id,
+      email: teacher2.email,
+      name: teacher2.name,
+      role: "teacher",
+    });
+    expect(context).toMatch(/"Ungraded Quiz".*1\/1 submitted.*no grades yet.*1 awaiting grading/i);
+
+    await db.deleteFrom("submissions").where("id", "=", submission.id).execute();
+    await db.deleteFrom("assignments").where("id", "=", assignment.id).execute();
+    await db.deleteFrom("class_students").where("class_id", "=", tempClass.id).execute();
+    await db.deleteFrom("classes").where("id", "=", tempClass.id).execute();
   });
 });
 

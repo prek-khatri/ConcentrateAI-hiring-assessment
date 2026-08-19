@@ -55,6 +55,44 @@ describe("ChatWidget", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: /chat/i })).toBeInTheDocument());
   });
 
+  it("clears the conversation when a different person logs in on the same tab", async () => {
+    // Regression test: this widget is one persisting component instance for the whole
+    // tab. If someone signs out and a different person signs in without a full page
+    // reload, the previous person's messages must not carry over into the new session.
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "teacher-1", name: "Terry", email: "teacher@example.com", role: "teacher" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { rerender } = render(<ChatWidget />);
+    fireEvent.click(await screen.findByRole("button", { name: /chat/i }));
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ reply: "Terry's average is 92." }),
+    });
+    fireEvent.change(screen.getByPlaceholderText(/ask a question/i), { target: { value: "average score" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await waitFor(() => expect(screen.getByText(/terry's average is 92/i)).toBeInTheDocument());
+
+    // A different person (different id) logs in on the same tab.
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "student-1", name: "Sam", email: "student@example.com", role: "student" }),
+    });
+    pathnameMock.mockReturnValue("/student");
+    rerender(<ChatWidget />);
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /chat/i })).toBeInTheDocument());
+    expect(screen.queryByText(/average score/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/terry's average is 92/i)).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/ask a question/i)).not.toBeInTheDocument();
+  });
+
   it("shows a toggle button once authenticated, and opens the panel", async () => {
     vi.stubGlobal(
       "fetch",

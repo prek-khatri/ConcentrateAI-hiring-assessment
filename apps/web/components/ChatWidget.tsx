@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
 import { authApi } from "@/lib/auth-api";
 import { chatApi } from "@/lib/chat-api";
@@ -16,6 +16,7 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastUserId = useRef<string | null>(null);
 
   // Re-checked on every navigation, not just once on mount: the root layout persists
   // across client-side route changes, so a fresh login redirect wouldn't otherwise
@@ -23,7 +24,20 @@ export function ChatWidget() {
   useEffect(() => {
     authApi
       .me()
-      .then((user) => setVisible(user.role === "teacher" || user.role === "student"))
+      .then((user) => {
+        const isChatRole = user.role === "teacher" || user.role === "student";
+        setVisible(isChatRole);
+        // The widget's own state (this conversation) otherwise survives a logout/login
+        // in the same tab too, since it's the same persisting component instance —
+        // a different person landing here would see the previous person's chat history.
+        if (lastUserId.current !== null && lastUserId.current !== user.id) {
+          setMessages([]);
+          setInput("");
+          setError(null);
+          setOpen(false);
+        }
+        lastUserId.current = isChatRole ? user.id : null;
+      })
       .catch(() => setVisible(false));
   }, [pathname]);
 
