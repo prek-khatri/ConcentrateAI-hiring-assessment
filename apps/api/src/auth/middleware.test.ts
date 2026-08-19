@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildApp } from "../app.js";
+import { db } from "../db/index.js";
 import { AUTH_COOKIE_NAME, signSessionToken } from "./jwt.js";
 import { env } from "../env.js";
 
@@ -24,6 +25,23 @@ describe("requireAuth", () => {
       cookies: { [AUTH_COOKIE_NAME]: token },
     });
     expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("403s when the user was suspended after the session token was issued", async () => {
+    const user = await db.selectFrom("users").selectAll().where("email", "=", "student3@example.com").executeTakeFirstOrThrow();
+    const token = signSessionToken({ sub: user.id, role: user.role }, env.JWT_SECRET);
+    await db.updateTable("users").set({ is_suspended: true }).where("id", "=", user.id).execute();
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/auth/me",
+      cookies: { [AUTH_COOKIE_NAME]: token },
+    });
+    expect(res.statusCode).toBe(403);
+
+    await db.updateTable("users").set({ is_suspended: false }).where("id", "=", user.id).execute();
     await app.close();
   });
 });
