@@ -8,3 +8,7 @@ export const LoginSchema = z.object({
 export const SubmitAssignmentSchema = z.object({
   content: z.string().min(1),
 });
+
+export const ChatMessageSchema = z.object({
+  message: z.string().min(1).max(1000),
+});

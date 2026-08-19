@@ -6,6 +6,7 @@ import { ApiError } from "./errors.js";
 import { env } from "./env.js";
 import { authRoutes } from "./routes/auth.js";
 import { studentRoutes } from "./routes/student.js";
+import { chatRoutes } from "./routes/chat.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -30,6 +31,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(authRoutes);
   await app.register(studentRoutes);
+  await app.register(chatRoutes);
 
   return app;
 }
