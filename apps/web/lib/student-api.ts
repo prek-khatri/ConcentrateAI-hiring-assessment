@@ -19,9 +19,21 @@ export type SubmissionSummary = {
   score: number | null;
   feedback: string | null;
 };
+export type AssignmentWithStatus = {
+  id: string;
+  title: string;
+  description: string | null;
+  due_at: string | null;
+  classId: string;
+  className: string;
+  submissionId: string | null;
+  score: number | null;
+};
 
 export const studentApi = {
   listClasses: () => apiFetch<{ classes: ClassSummary[] }>("/api/student/classes"),
+
+  listAllAssignments: () => apiFetch<{ assignments: AssignmentWithStatus[] }>("/api/student/assignments"),
 
   listAssignments: (classId: string) =>
     apiFetch<{ assignments: Assignment[] }>(`/api/student/classes/${classId}/assignments`),
