@@ -7,6 +7,7 @@ import { env } from "./env.js";
 import { authRoutes } from "./routes/auth.js";
 import { studentRoutes } from "./routes/student.js";
 import { adminRoutes } from "./routes/admin.js";
+import { statsRoutes } from "./routes/stats.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -32,6 +33,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes);
   await app.register(studentRoutes);
   await app.register(adminRoutes);
+  await app.register(statsRoutes);
 
   return app;
 }
