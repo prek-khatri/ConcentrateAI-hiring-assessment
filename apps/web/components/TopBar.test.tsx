@@ -44,7 +44,7 @@ describe("TopBar", () => {
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
   });
 
-  it("still redirects to login even if the logout request fails", async () => {
+  it("redirects to login when logout 401s (session was already invalid — nothing to clear)", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -64,5 +64,28 @@ describe("TopBar", () => {
     fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
+  });
+
+  it("does NOT redirect on a non-auth failure — the session cookie may still be valid", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "1", name: "Sam Student", email: "student@example.com", role: "student" }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({ error: { code: "INTERNAL_ERROR", message: "boom" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TopBar />);
+    await waitFor(() => screen.getByText("Sam Student"));
+    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/couldn't sign out/i));
+    expect(pushMock).not.toHaveBeenCalled();
   });
 });
