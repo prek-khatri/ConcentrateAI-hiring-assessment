@@ -18,6 +18,13 @@ export function ChatWidget() {
   const [error, setError] = useState<string | null>(null);
   const lastUserId = useRef<string | null>(null);
 
+  function clearConversation() {
+    setMessages([]);
+    setInput("");
+    setError(null);
+    setOpen(false);
+  }
+
   // Re-checked on every navigation, not just once on mount: the root layout persists
   // across client-side route changes, so a fresh login redirect wouldn't otherwise
   // trigger a re-check and the widget could get stuck on the previous page's auth state.
@@ -27,18 +34,21 @@ export function ChatWidget() {
       .then((user) => {
         const isChatRole = user.role === "teacher" || user.role === "student";
         setVisible(isChatRole);
-        // The widget's own state (this conversation) otherwise survives a logout/login
-        // in the same tab too, since it's the same persisting component instance —
-        // a different person landing here would see the previous person's chat history.
-        if (lastUserId.current !== null && lastUserId.current !== user.id) {
-          setMessages([]);
-          setInput("");
-          setError(null);
-          setOpen(false);
-        }
+        // Safety net for a different person landing here without ever tripping the
+        // catch below (e.g. a stale cookie silently swapped for a new one) — the
+        // common logout path is handled the moment it happens, in the catch.
+        if (lastUserId.current !== null && lastUserId.current !== user.id) clearConversation();
         lastUserId.current = isChatRole ? user.id : null;
       })
-      .catch(() => setVisible(false));
+      .catch(() => {
+        setVisible(false);
+        // Clear right when this tab becomes unauthenticated — i.e. the moment someone
+        // signs out — rather than waiting for whoever logs in next to trigger it. The
+        // widget is one persisting component instance for the whole tab, so its own
+        // state otherwise survives a logout and the next person would see this chat.
+        if (lastUserId.current !== null) clearConversation();
+        lastUserId.current = null;
+      });
   }, [pathname]);
 
   async function handleSend(e: FormEvent) {

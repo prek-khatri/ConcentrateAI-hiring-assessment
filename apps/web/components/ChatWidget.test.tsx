@@ -93,6 +93,42 @@ describe("ChatWidget", () => {
     expect(screen.queryByPlaceholderText(/ask a question/i)).not.toBeInTheDocument();
   });
 
+  it("clears the conversation the moment the user signs out, before anyone logs back in", async () => {
+    // Distinguishes this from the "different person" test above: if clearing only
+    // happened by comparing user ids on the *next* login, logging back in as the SAME
+    // person would keep the old messages (same id, no id mismatch detected). Clearing
+    // right at logout means it's gone regardless of who — or when — logs in next.
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "teacher-1", name: "Terry", email: "teacher@example.com", role: "teacher" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { rerender } = render(<ChatWidget />);
+    fireEvent.click(await screen.findByRole("button", { name: /chat/i }));
+    fireEvent.change(screen.getByPlaceholderText(/ask a question/i), { target: { value: "students enrolled" } });
+
+    // Sign out: the next auth check 401s.
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({ error: {} }) });
+    pathnameMock.mockReturnValue("/");
+    rerender(<ChatWidget />);
+    await waitFor(() => expect(screen.queryByRole("button", { name: /chat/i })).not.toBeInTheDocument());
+
+    // The SAME person logs back in.
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ id: "teacher-1", name: "Terry", email: "teacher@example.com", role: "teacher" }),
+    });
+    pathnameMock.mockReturnValue("/teacher");
+    rerender(<ChatWidget />);
+    fireEvent.click(await screen.findByRole("button", { name: /chat/i }));
+
+    expect(screen.queryByText(/students enrolled/i)).not.toBeInTheDocument();
+    expect((screen.getByPlaceholderText(/ask a question/i) as HTMLInputElement).value).toBe("");
+  });
+
   it("shows a toggle button once authenticated, and opens the panel", async () => {
     vi.stubGlobal(
       "fetch",
