@@ -118,11 +118,10 @@ export default function AssignmentDetailPage() {
   }, [assignmentId]);
 
   function startEditing() {
-    if (!detail) return;
-    setEditTitle(detail.assignment.title);
-    setEditDescription(detail.assignment.description ?? "");
-    setEditDueAt(detail.assignment.due_at ? detail.assignment.due_at.slice(0, 10) : "");
-    setEditPublished(detail.assignment.published);
+    setEditTitle(detail!.assignment.title);
+    setEditDescription(detail!.assignment.description ?? "");
+    setEditDueAt(detail!.assignment.due_at ? detail!.assignment.due_at.slice(0, 10) : "");
+    setEditPublished(detail!.assignment.published);
     setEditing(true);
   }
 
@@ -147,12 +146,11 @@ export default function AssignmentDetailPage() {
   }
 
   async function handleDelete() {
-    if (!detail) return;
     if (!confirm("Delete this assignment? This also removes any submissions and grades.")) return;
     setError(null);
     try {
       await apiFetch(`/api/teacher/assignments/${assignmentId}`, { method: "DELETE" });
-      router.push(`/teacher/classes/${detail.assignment.class_id}`);
+      router.push(`/teacher/classes/${detail!.assignment.class_id}`);
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Could not delete assignment.");
     }

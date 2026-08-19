@@ -69,9 +69,8 @@ export default function ClassDetailPage() {
   }
 
   function startEditingClass() {
-    if (!detail) return;
-    setEditName(detail.class.name);
-    setEditDescription(detail.class.description ?? "");
+    setEditName(detail!.class.name);
+    setEditDescription(detail!.class.description ?? "");
     setEditingClass(true);
   }
 
