@@ -73,7 +73,7 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <a href={`${API_URL}/auth/oauth/google`} className="text-center text-sm underline">
+      <a href={`${API_URL}/auth/google`} className="text-center text-sm underline">
         Sign in with Google
       </a>
     </main>

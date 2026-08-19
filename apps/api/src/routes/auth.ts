@@ -43,7 +43,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return request.user;
   });
 
-  app.get("/auth/oauth/google", async (_request, reply) => {
+  app.get("/auth/google", async (_request, reply) => {
     const { url, state, codeVerifier } = await createGoogleAuthRequest();
     const isProd = env.NODE_ENV === "production";
     reply.setCookie(OAUTH_STATE_COOKIE, state, { httpOnly: true, secure: isProd, sameSite: "lax", path: "/" });
@@ -56,7 +56,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return reply.redirect(url.toString());
   });
 
-  app.get("/auth/oauth/google/callback", async (request, reply) => {
+  app.get("/auth/google/callback", async (request, reply) => {
     const query = request.query as { code?: string; state?: string };
     const storedState = request.cookies[OAUTH_STATE_COOKIE];
     const codeVerifier = request.cookies[OAUTH_VERIFIER_COOKIE];
@@ -111,6 +111,6 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.clearCookie(OAUTH_STATE_COOKIE, { path: "/" });
     reply.clearCookie(OAUTH_VERIFIER_COOKIE, { path: "/" });
 
-    return reply.redirect(`/dashboard`);
+    return reply.redirect(`${env.WEB_ORIGIN}/${user.role}`);
   });
 }
