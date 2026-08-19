@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the full Concentrate.ai school portal (Admin/Teacher/Student roles, class/assignment/grading workflows, statistics API, OAuth+JWT auth, Docker/CI deployment) to the hiring assessment's spec, split across three engineers working largely in parallel.
+**Goal:** Build the full Concentrate.ai school portal (Admin/Teacher/Student roles, class/assignment/grading workflows, statistics API, OAuth+JWT auth, Docker/CI deployment) to the hiring assessment's spec, split across three engineers by **role vertical** — each owns their role's backend module(s) and UI end-to-end.
 
 **Architecture:** Modular monolith — one Fastify API with domain modules, one Next.js frontend, npm workspaces monorepo. Server-side authorization only; frontend role checks are UX-only.
 
@@ -23,15 +23,17 @@
 
 ## Team Assignment & Sequencing
 
-- **Prateek — Foundation & DevOps (Tasks P1–P12):** repo scaffold, DB schema/migrations/seed, shared Zod/DTO contracts, Fastify+Next bootstrap, Redis, Google OAuth + JWT + RBAC, Docker/Nginx/Certbot, CI/CD.
-- **Vraj — Backend Domain (Tasks V1–V9):** Users, Teacher Groups, Classes, Enrollment, Assignments, Submissions, Grades, Statistics API + Redis caching, backend test/coverage sweep.
-- **Preksha — Frontend & E2E (Tasks F1–F12):** app shell, all role UIs, API client layer, component tests, Playwright E2E.
+- **Prateek — Foundation + Student Vertical (Tasks P1–P12, S1–S4):** everything shared (repo scaffold, DB schema/migrations/seed, shared Zod/DTO contracts, Fastify+Next bootstrap, Redis, Google OAuth+JWT+RBAC, Docker/Nginx/Certbot, CI/CD), plus the Student-facing app shell/nav and all Student UI.
+- **Vraj — Admin Vertical (Tasks A1–A7):** Users management, Teacher Groups, Statistics API+caching — backend and UI, end to end.
+- **Preksha — Teacher Vertical (Tasks T1–T9):** Classes, Enrollment, Assignments, Submissions, Grades — backend and UI, end to end. This is the heaviest vertical since Teacher is the primary actor for most of the domain model (creates classes, manages assignments, grades submissions).
 
-**Critical path:** P1–P9 (repo scaffold through auth) must land before Vraj or Preksha start — they define the DB schema, shared Zod/DTO types, and `requireAuth`/`requireRole` signatures both tracks build against. P10 (Next.js bootstrap + base API client) gates Preksha specifically. Once P1–P10 are merged, Vraj and Preksha work in parallel; each Preksha task names the specific Vraj task whose DTO it consumes. P11 (Docker/Nginx) and P12 (CI) are Prateek's, but P12 only finalizes once `test`/`coverage`/`lint`/`typecheck` scripts exist in every workspace (i.e., after V9 and F10/F12 land) — treat P12 as an integration task done last.
+**Why the load isn't split 3 ways evenly by module count:** Submissions and Grades are written by Teachers and read by Students against the *same* tables — splitting one small backend module's routes across two people creates needless merge coordination for no benefit. Whoever owns Teacher owns the whole module; Student's vertical consumes the read/create-submission endpoints as a frontend concern. To balance total effort, Student's vertical absorbs Foundation (the highest-leverage, hardest work — schema, auth, Docker, CI) instead of a slice of backend domain modules.
+
+**Critical path:** P1–P10 (repo scaffold through Next.js bootstrap) must land before Vraj or Preksha start — they define the DB schema, shared Zod/DTO types, `requireAuth`/`requireRole` signatures, and base API client every vertical builds against. Once P1–P10 are merged, Vraj (Admin) and Preksha (Teacher) work fully in parallel on their own tables/routes with zero file overlap. Prateek continues into S1–S4 (Student vertical) in parallel with them. P11 (Docker/Nginx) and P12 (CI) are integration tasks — do them last, once `test`/`coverage`/`lint`/`typecheck` scripts exist in every workspace (i.e. after A7, T9, S4 land).
 
 ---
 
-## Track: Prateek — Foundation & DevOps
+## Track: Prateek — Foundation + Student Vertical
 
 ### Task P1: Root workspace scaffold
 
@@ -275,9 +277,9 @@ export async function down(db: Kysely<any>): Promise<void> {
 ```
 - [ ] **Step 2:** Write `002_create_oauth_accounts.ts` — table `oauth_accounts` (`id` uuid PK, `user_id` uuid FK→users.id, `provider` varchar not null, `provider_account_id` varchar not null, `created_at` timestamp), unique index on `(provider, provider_account_id)`.
 - [ ] **Step 3:** Write `003_create_teacher_groups.ts` — table `teacher_groups` (`id` uuid PK, `name` varchar not null, `created_at`, `updated_at`).
-- [ ] **Step 4:** Write `004_create_teacher_group_members.ts` — table `teacher_group_members` (`teacher_group_id` uuid FK→teacher_groups.id, `teacher_id` uuid FK→users.id), composite PK `(teacher_group_id, teacher_id)`.
+- [ ] **Step 4:** Write `004_create_teacher_group_members.ts` — table `teacher_group_members` (`teacher_group_id` uuid FK→teacher_groups.id `ON DELETE CASCADE`, `teacher_id` uuid FK→users.id), composite PK `(teacher_group_id, teacher_id)`.
 - [ ] **Step 5:** Write `005_create_classes.ts` — table `classes` (`id` uuid PK, `name` varchar not null, `description` text nullable, `teacher_id` uuid FK→users.id not null, `created_at`, `updated_at`), index on `teacher_id`.
-- [ ] **Step 6:** Write `006_create_class_students.ts` — table `class_students` (`class_id` uuid FK→classes.id, `student_id` uuid FK→users.id, `created_at`), composite PK `(class_id, student_id)`, indexes on both columns.
+- [ ] **Step 6:** Write `006_create_class_students.ts` — table `class_students` (`class_id` uuid FK→classes.id `ON DELETE CASCADE`, `student_id` uuid FK→users.id, `created_at`), composite PK `(class_id, student_id)`, indexes on both columns.
 - [ ] **Step 7:** Write `007_create_assignments.ts` — table `assignments` (`id` uuid PK, `class_id` uuid FK→classes.id not null, `title` varchar not null, `description` text nullable, `published` boolean not null default false, `due_at` timestamp nullable, `created_at`, `updated_at`), indexes on `class_id` and `published`.
 - [ ] **Step 8:** Write `008_create_submissions.ts` — table `submissions` (`id` uuid PK, `assignment_id` uuid FK→assignments.id not null, `student_id` uuid FK→users.id not null, `content` text not null, `submitted_at` timestamp not null default now(), `updated_at` timestamp not null default now()), unique index on `(assignment_id, student_id)`, indexes on each column individually.
 - [ ] **Step 9:** Write `009_create_grades.ts` — table `grades` (`id` uuid PK, `submission_id` uuid unique not null FK→submissions.id, `score` numeric not null, `feedback` text nullable, `graded_at` timestamp not null default now(), `graded_by` uuid FK→users.id not null), plus `CHECK (score >= 0 AND score <= 100)` constraint via `sql` tag, index on `submission_id`.
@@ -328,7 +330,7 @@ git commit -m "feat: database schema — all 9 migrations and DB type map"
 
 **Interfaces:**
 - Consumes: `createDb<DB>` from `packages/db/src/db.ts`, `DB` type from `packages/db/src/types.ts`.
-- Produces: idempotent seed (safe to re-run — upserts by fixed UUIDs or `email`/`name` unique constraints) matching spec §9: 1 admin, 2 teachers, 3 students, 1 class ("Biology 101") owned by `teacher@example.com` with all 3 students enrolled, 2 assignments (one published with a submission+grade, one draft), so both graded and ungraded states exist for stats/UI testing.
+- Produces: idempotent seed (safe to re-run — upserts by fixed UUIDs) matching spec §9: 1 admin, 2 teachers, 3 students, 1 class ("Biology 101") owned by `teacher@example.com` with all 3 students enrolled, 2 assignments (one published with a submission+grade, one draft), so both graded and ungraded states exist for stats/UI testing.
 
 - [ ] **Step 1:** Write `packages/db/seeds/seed.ts` using fixed, hardcoded UUIDs per entity (e.g. `const ADMIN_ID = "00000000-0000-0000-0000-000000000001"`) so re-running is idempotent via `onConflict((oc) => oc.column("id").doNothing())` on each insert.
 - [ ] **Step 2:** Insert users: `admin@example.com` (admin), `teacher@example.com`/`teacher2@example.com` (teacher), `student@example.com`/`student2@example.com`/`student3@example.com` (student). All `is_suspended: false`.
@@ -354,7 +356,7 @@ git commit -m "feat: deterministic seed data"
 - Create: `packages/shared/tests/errors.test.ts`
 
 **Interfaces:**
-- Produces (exact names Vraj and Preksha both import from `@school/shared`):
+- Produces (exact names both verticals import from `@school/shared`):
   - `ErrorCode = "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "VALIDATION_ERROR" | "CONFLICT" | "INTERNAL_ERROR"`
   - `class ApiError extends Error { code: ErrorCode; statusCode: number }`
   - `CreateUserSchema`, `UpdateUserSchema`, `CreateClassSchema`, `UpdateClassSchema`, `CreateAssignmentSchema`, `UpdateAssignmentSchema`, `CreateSubmissionSchema`, `GradeSubmissionSchema`, `CreateTeacherGroupSchema`, `UpdateTeacherGroupSchema` — each `z.object({...})` matching the fields in the corresponding migration from P4 (no `id`/`created_at`/`updated_at`/ownership fields, those come from route params or `request.user`).
@@ -535,7 +537,7 @@ git commit -m "feat: fastify bootstrap, error handler, health check"
 - Create: `apps/api/tests/plugins/redis.test.ts`
 
 **Interfaces:**
-- Produces: `app.redis` decorator (an `ioredis` client instance), available to every route registered after this plugin. Vraj's stats caching (Task V8) uses `app.redis.get`/`set`/`del`.
+- Produces: `app.redis` decorator (an `ioredis` client instance), available to every route registered after this plugin. Vraj's stats caching (Task A3) uses `app.redis.get`/`set`/`del`.
 
 - [ ] **Step 1: Write the failing test**
 ```typescript
@@ -602,7 +604,7 @@ git commit -m "feat: redis connection plugin"
 
 **Interfaces:**
 - Consumes: `env.JWT_SECRET`, `env.OAUTH_CLIENT_ID`, `env.OAUTH_CLIENT_SECRET`, `env.OAUTH_CALLBACK_URL` from `./config/env.js`; `DB` type from `@school/db/types`; `ApiError` from `@school/shared`.
-- Produces (every downstream route-module task in V1–V9 imports these exact names):
+- Produces (every downstream route-module task in A1–A3 and T1–T5 imports these exact names):
 ```typescript
 // apps/api/src/middleware/require-auth.ts
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply): Promise<void>
@@ -614,7 +616,9 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
 export function requireRole(...roles: Array<"admin"|"teacher"|"student">): (request: FastifyRequest, reply: FastifyReply) => Promise<void>
 // throws ApiError("FORBIDDEN", ...) if request.user.role not in roles
 ```
-Routes: `GET /auth/oauth/google`, `GET /auth/oauth/google/callback`, `GET /api/auth/me`, `POST /api/auth/logout`.
+Also add here, for E2E-only use (Task S4), a test-only backdoor login route gated behind `NODE_ENV !== "production"`: `POST /auth/dev-login` accepting `{email: string}`, looking the user up, signing a JWT for them, setting the cookie — driving real Google OAuth in CI/Playwright isn't practical.
+
+Routes: `GET /auth/oauth/google`, `GET /auth/oauth/google/callback`, `GET /api/auth/me`, `POST /api/auth/logout`, `POST /auth/dev-login` (non-production only).
 
 - [ ] **Step 1: Write the failing test**
 ```typescript
@@ -741,34 +745,39 @@ export function requireRole(...roles: Array<"admin" | "teacher" | "student">) {
   };
 }
 ```
-- [ ] **Step 8:** Create `apps/api/src/db.ts` — singleton: `export const db = createDb<DB>(env.DATABASE_URL);` (imports `createDb` from `@school/db`, `DB` from `@school/db/types`, `env` from `./config/env.js`). This is the shared DB handle every module task (V1–V9) imports.
+- [ ] **Step 8:** Create `apps/api/src/db.ts` — singleton: `export const db = createDb<DB>(env.DATABASE_URL);` (imports `createDb` from `@school/db`, `DB` from `@school/db/types`, `env` from `./config/env.js`). This is the shared DB handle every module task (A1–A3, T1–T5) imports.
 - [ ] **Step 9:** Write `apps/api/src/modules/auth/auth.service.ts` using `arctic`'s `Google` class for the OAuth2/PKCE flow: `getAuthorizationUrl(state, codeVerifier)`, `exchangeCodeForTokens(code, codeVerifier)`, `fetchGoogleUserInfo(accessToken)` (calls `https://www.googleapis.com/oauth2/v3/userinfo`), and `findOrCreateUser(googleProfile)` which calls the repository's `findOAuthAccount` → `findUserById`, or `findUserByEmail` → link, or `createUserWithOAuth` in that priority order.
 - [ ] **Step 10:** Write `apps/api/src/modules/auth/auth.routes.ts`:
   - `GET /auth/oauth/google`: generates PKCE verifier + state, stores both in short-lived signed cookies, redirects to Google's authorization URL.
   - `GET /auth/oauth/google/callback`: reads `code`/`state` query params, validates `state` against the cookie, exchanges the code, fetches the profile, calls `findOrCreateUser`, signs a JWT (`signJwt({sub: user.id, role: user.role}, env.JWT_SECRET)`), sets it via `reply.setCookie(AUTH_COOKIE_NAME, token, authCookieOptions(env.NODE_ENV === "production"))`, redirects to the frontend dashboard.
   - `GET /api/auth/me` (preHandler: `requireAuth`): returns `{ id, name, email, role }` from `request.user`.
   - `POST /api/auth/logout` (preHandler: `requireAuth`): `reply.clearCookie(AUTH_COOKIE_NAME, { path: "/" })`, returns `204`.
+  - `POST /auth/dev-login` (only registered `if (env.NODE_ENV !== "production")`): body `{email: string}`, looks up the user by email, signs and sets the session cookie exactly like the OAuth callback does, returns `200`.
 - [ ] **Step 11:** In `apps/api/src/app.ts`, register `authRoutes` plugin after the redis plugin.
-- [ ] **Step 12:** Write `apps/api/tests/modules/auth/auth.routes.test.ts` covering: `GET /api/auth/me` → 401 with no cookie; `GET /api/auth/me` → 200 with a valid signed JWT cookie (seed a user first, sign a JWT for their id, inject with `cookies: {[AUTH_COOKIE_NAME]: token}`); `POST /api/auth/logout` → 204 and clears cookie; suspended user → `GET /api/auth/me` returns 403.
+- [ ] **Step 12:** Write `apps/api/tests/modules/auth/auth.routes.test.ts` covering: `GET /api/auth/me` → 401 with no cookie; `GET /api/auth/me` → 200 with a valid signed JWT cookie (seed a user first, sign a JWT for their id, inject with `cookies: {[AUTH_COOKIE_NAME]: token}`); `POST /api/auth/logout` → 204 and clears cookie; suspended user → `GET /api/auth/me` returns 403; `POST /auth/dev-login` → 200 and sets a working cookie in non-production `NODE_ENV`.
 - [ ] **Step 13:** Run `npm run test --workspace=apps/api`. Expected: all pass, including Step 1's test now that `require-auth.ts` exists.
 - [ ] **Step 14: Commit**
 ```bash
 git add packages/auth/ apps/api/src/db.ts apps/api/src/middleware/ apps/api/src/modules/auth/ apps/api/src/app.ts apps/api/tests/modules/auth/ apps/api/tests/middleware/
-git commit -m "feat: google oauth, jwt auth, requireAuth/requireRole middleware"
+git commit -m "feat: google oauth, jwt auth, requireAuth/requireRole middleware, dev-login for e2e"
 ```
 
 ---
 
-### Task P10: Next.js bootstrap + base API client
+### Task P10: Next.js bootstrap + base API client + app shell/nav
 
 **Files:**
 - Create: `apps/web/next.config.ts`, `apps/web/tailwind.config.ts`, `apps/web/app/layout.tsx`, `apps/web/app/globals.css`
 - Create: `apps/web/app/(auth)/login/page.tsx`
 - Create: `apps/web/lib/api/client.ts`
+- Create: `apps/web/lib/api/auth.ts`
+- Create: `apps/web/components/shell/Sidebar.tsx`, `apps/web/components/shell/TopBar.tsx`, `apps/web/components/shell/AppShell.tsx`
+- Create: `apps/web/app/dashboard/layout.tsx`, `apps/web/app/dashboard/page.tsx`
 - Create: `apps/web/tests/lib/api/client.test.ts`
+- Create: `apps/web/tests/components/shell/Sidebar.test.tsx`
 
 **Interfaces:**
-- Produces: `export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T>` — wraps `fetch` with `credentials: "include"`, base URL from `NEXT_PUBLIC_API_URL`, JSON parsing, and throws a typed `ApiClientError` (with `.code`/`.message` from the `{error:{code,message}}` body) on non-2xx. Every `lib/api/*.ts` module in Preksha's tasks (F2–F9) is built on this.
+- Produces: `export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T>` — wraps `fetch` with `credentials: "include"`, base URL from `NEXT_PUBLIC_API_URL`, JSON parsing, and throws a typed `ApiClientError` (with `.code`/`.message` from the `{error:{code,message}}` body) on non-2xx. Every `lib/api/*.ts` module in Vraj's (A4–A6) and Preksha's (T6–T8) tasks is built on this. `authApi.{me,logout}` in `lib/api/auth.ts`. `<AppShell role={...}>` component every dashboard page (Admin/Teacher/Student) wraps its content in, built on `<Sidebar>`'s `NAV_BY_ROLE` map (admin: Dashboard/Users/Teacher Groups/Statistics; teacher: Dashboard/My Classes/Assignments/Submissions/Statistics; student: Dashboard/My Classes/Assignments/Grades — per spec §31).
 
 - [ ] **Step 1: Write the failing test**
 ```typescript
@@ -827,11 +836,35 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 - [ ] **Step 4:** Run test again. Expected: PASS.
 - [ ] **Step 5:** Write `apps/web/app/layout.tsx` (root HTML shell, imports `globals.css`), `apps/web/app/globals.css` (Tailwind directives), `apps/web/tailwind.config.ts` (content globs over `app/**` and `components/**`).
 - [ ] **Step 6:** Write `apps/web/app/(auth)/login/page.tsx` — a single "Sign in with Google" button linking to `${NEXT_PUBLIC_API_URL}/auth/oauth/google`.
-- [ ] **Step 7:** Run `npm run dev --workspace=apps/web` and confirm `http://localhost:3000/login` renders the button (manual check, not automated).
-- [ ] **Step 8: Commit**
+- [ ] **Step 7: Write the failing test**
+```tsx
+// apps/web/tests/components/shell/Sidebar.test.tsx
+import { render, screen } from "@testing-library/react";
+import { describe, it, expect } from "vitest";
+import { Sidebar } from "../../../components/shell/Sidebar";
+
+describe("Sidebar", () => {
+  it("shows admin nav items for admin role", () => {
+    render(<Sidebar role="admin" />);
+    expect(screen.getByRole("link", { name: /users/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /my classes/i })).not.toBeInTheDocument();
+  });
+
+  it("shows student nav items for student role", () => {
+    render(<Sidebar role="student" />);
+    expect(screen.getByRole("link", { name: /grades/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^users$/i })).not.toBeInTheDocument();
+  });
+});
+```
+- [ ] **Step 8:** Run test. Expected: FAIL. Write `apps/web/components/shell/Sidebar.tsx` with a `NAV_BY_ROLE: Record<Role, {label: string; href: string}[]>` map matching spec §31 exactly, rendering `<Link>` per entry.
+- [ ] **Step 9:** Run test again. Expected: PASS.
+- [ ] **Step 10:** Write `apps/web/lib/api/auth.ts` (`me`/`logout` wrapping `apiFetch`), `TopBar.tsx` (user name, role badge, logout button calling `authApi.logout()` then redirecting to `/login`), `AppShell.tsx` (composes `Sidebar` + `TopBar` + `children`).
+- [ ] **Step 11:** Write `apps/web/app/dashboard/layout.tsx` as a server component calling `authApi.me()` (via a server-side fetch forwarding cookies) — redirect to `/login` on 401, render `<AppShell role={user.role}>{children}</AppShell>` otherwise. Write a minimal `apps/web/app/dashboard/page.tsx` placeholder welcome message.
+- [ ] **Step 12: Commit**
 ```bash
-git add apps/web/next.config.ts apps/web/tailwind.config.ts apps/web/app/ apps/web/lib/api/client.ts apps/web/tests/lib/api/client.test.ts
-git commit -m "feat: next.js bootstrap, login page, base api client"
+git add apps/web/next.config.ts apps/web/tailwind.config.ts apps/web/app/ apps/web/lib/api/client.ts apps/web/lib/api/auth.ts apps/web/components/shell/ apps/web/tests/
+git commit -m "feat: next.js bootstrap, base api client, app shell with role-aware nav"
 ```
 
 ---
@@ -845,13 +878,13 @@ git commit -m "feat: next.js bootstrap, login page, base api client"
 - Modify: `README.md` (add Certbot/self-host section)
 
 **Interfaces:**
-- Consumes: working `apps/api` and `apps/web` builds (requires P1–P10 merged, and ideally V1–V9/F1–F12 landed so `npm run build` succeeds end to end — run this task's build-verification step last, after other tracks land, even though the Dockerfile itself can be written earlier).
+- Consumes: working `apps/api` and `apps/web` builds — write this task's config early, but only run its build-verification step (Step 5) once the Admin and Teacher verticals (A1–A7, T1–T9) and the Student vertical (S1–S4) have landed, so `npm run build` succeeds end to end.
 
 - [ ] **Step 1:** Write root `Dockerfile` with three stages: `deps` (copies all `package.json`s + lockfile, `npm ci`), `build` (copies source, runs `npm run build --workspaces --if-present`), `runtime` (copies only `apps/api/dist`, `apps/web/.next`, `node_modules` from `deps`, and each workspace's `package.json`; runs as non-root user; `CMD` is overridden per-service via compose).
 - [ ] **Step 2:** Extend `docker-compose.yml` with `api` (build: `.`, target `runtime`, command running `node apps/api/dist/server.js`, `depends_on: {postgres: {condition: service_healthy}, redis: {condition: service_healthy}}`, healthcheck hitting `/health`), `web` (build: `.`, command running `next start`, `depends_on: {api: {condition: service_healthy}}`), `nginx` (image `nginx:alpine`, mounts `docker/nginx/default.conf`, ports `80:80`/`443:443`, `depends_on: [web, api]`).
 - [ ] **Step 3:** Write `docker/nginx/default.conf` — TLS termination stanza (commented placeholder for cert paths), `location /api/ { proxy_pass http://api:4000/; proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto $scheme; proxy_set_header Host $host; }`, `location / { proxy_pass http://web:3000/; ... same headers ... }`.
 - [ ] **Step 4:** Add a `README.md` section "Self-Hosted Deployment" documenting the 6-step Certbot flow from spec §47 (DNS → open ports → start compose → issue cert → configure renewal → reload nginx), with the exact `certbot certonly --webroot` command and a `crontab` line for renewal.
-- [ ] **Step 5 (run once other tracks have landed):** Run `docker compose up -d --build`. Expected: all 5 services (`postgres`, `redis`, `api`, `web`, `nginx`) report healthy; `curl http://localhost/api/health` returns `{"status":"ok"}`; `curl http://localhost/` returns the Next.js homepage HTML.
+- [ ] **Step 5 (run once the other two verticals have landed):** Run `docker compose up -d --build`. Expected: all 5 services (`postgres`, `redis`, `api`, `web`, `nginx`) report healthy; `curl http://localhost/api/health` returns `{"status":"ok"}`; `curl http://localhost/` returns the Next.js homepage HTML.
 - [ ] **Step 6: Commit**
 ```bash
 git add Dockerfile docker-compose.yml docker/nginx/default.conf README.md
@@ -866,7 +899,7 @@ git commit -m "feat: production docker stack, nginx reverse proxy, certbot docs"
 - Create: `.github/workflows/ci.yml`
 
 **Interfaces:**
-- Consumes: `test`, `coverage`, `lint`, `typecheck`, `build` scripts existing in every workspace (Vraj's V9 and Preksha's F10/F12 are what make `coverage` meaningful — this task should be the last one merged).
+- Consumes: `test`, `coverage`, `lint`, `typecheck`, `build` scripts existing in every workspace (Vraj's A7 and Preksha's T9 and Prateek's S4 are what make `coverage` meaningful — this task should be the last one merged).
 
 - [ ] **Step 1:** Write `.github/workflows/ci.yml` with a `test` job: checkout → setup-node (with npm cache) → `npm ci` → `npm run lint` → `npm run typecheck` → `docker compose up -d postgres redis` → wait-for-healthy loop → `npm run migrate --workspace=packages/db` → `npm run seed --workspace=packages/db` → `npm run coverage` (fails the job if any workspace drops below 100%) → `npm run build`.
 - [ ] **Step 2:** Add a `docker` job (needs: `test`): checkout → `docker build .` to confirm the image builds.
@@ -881,11 +914,133 @@ git commit -m "feat: github actions ci/cd pipeline"
 
 ---
 
-## Track: Vraj — Backend Domain
+### Task S1: Student — Classes/Assignments/Submission UI
 
-*Every task below depends on Prateek's P1–P9 (schema, shared schemas/DTOs, `requireAuth`/`requireRole`, `db` singleton) being merged. Follow the exact TDD/file pattern demonstrated in full for Task V1 — repeat it for V2–V7 with the fields/routes specified.*
+**Files:**
+- Create: `apps/web/lib/api/classes.ts`, `apps/web/lib/api/assignments.ts`, `apps/web/lib/api/submissions.ts`
+- Create: `apps/web/app/student/classes/page.tsx`, `apps/web/app/student/classes/[id]/page.tsx`, `apps/web/app/student/assignments/[id]/page.tsx`
+- Create: `apps/web/components/student/AssignmentDetail.tsx`, `apps/web/components/student/SubmissionForm.tsx`
+- Create: `apps/web/tests/components/student/SubmissionForm.test.tsx`
 
-### Task V1: Users module — Admin CRUD + suspension
+**Interfaces:**
+- Consumes: `apiFetch` (P10). Depends on Preksha's **Task T1** (classes list scoped to enrolled-for-student), **T3** (published-only assignment visibility), **T4** (submission create/update routes).
+- Produces: `classesApi.list()`, `assignmentsApi.listForClass(classId)`, `assignmentsApi.get(id)`, `submissionsApi.getMine(assignmentId)`, `submissionsApi.create(assignmentId, input)`, `submissionsApi.update(assignmentId, input)` — reused as-is by Vraj/Preksha wherever a read-only class/assignment view is needed elsewhere, though each vertical primarily calls its own UI-specific wrapper.
+
+- [ ] **Step 1: Write the failing test**
+```tsx
+// apps/web/tests/components/student/SubmissionForm.test.tsx
+import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { SubmissionForm } from "../../../components/student/SubmissionForm";
+
+describe("SubmissionForm", () => {
+  it("shows a field error on empty content", () => {
+    const onSubmit = vi.fn();
+    render(<SubmissionForm onSubmit={onSubmit} />);
+    fireEvent.click(screen.getByRole("button", { name: /submit assignment/i }));
+    expect(screen.getByText(/required/i)).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+```
+- [ ] **Step 2:** Run `npm run test --workspace=apps/web -- SubmissionForm.test.tsx`. Expected: FAIL.
+- [ ] **Step 3:** Implement `lib/api/classes.ts` (`list()` — server scopes to enrolled classes for a student caller, teacher's own for a teacher caller, per T1), `lib/api/assignments.ts` (`listForClass`, `get` — server scopes to published-only for students, per T3), `lib/api/submissions.ts` (`getMine`, `create`, `update` — server forces `student_id` to the caller, per T4).
+- [ ] **Step 4:** Implement `AssignmentDetail.tsx` (Title/Description/Due date per spec §35), `SubmissionForm.tsx` (textarea validated with `CreateSubmissionSchema` from `@school/shared`, min-length-1 field error, Submit Assignment button, disabled while pending).
+- [ ] **Step 5:** Implement `app/student/classes/page.tsx` (list, loading/empty/error states per spec §36), `app/student/classes/[id]/page.tsx` (class info + published assignments list), `app/student/assignments/[id]/page.tsx` (renders `AssignmentDetail` + `SubmissionForm`, or the grade view once graded — grade rendering wired in Task S2).
+- [ ] **Step 6:** Run test to green.
+- [ ] **Step 7: Commit**
+```bash
+git add apps/web/lib/api/classes.ts apps/web/lib/api/assignments.ts apps/web/lib/api/submissions.ts apps/web/app/student/ apps/web/components/student/AssignmentDetail.tsx apps/web/components/student/SubmissionForm.tsx apps/web/tests/components/student/SubmissionForm.test.tsx
+git commit -m "feat: student classes/assignments/submission UI"
+```
+
+---
+
+### Task S2: Student — Grades UI
+
+**Files:**
+- Create: `apps/web/lib/api/grades.ts`
+- Create: `apps/web/app/student/grades/page.tsx`
+- Create: `apps/web/components/student/GradeCard.tsx`
+- Modify: `apps/web/app/student/assignments/[id]/page.tsx` (show grade + feedback after grading, per spec §35)
+
+**Interfaces:**
+- Depends on Preksha's **Task T5** (grades — student read route).
+
+- [ ] **Step 1:** Implement `lib/api/grades.ts` (`get(submissionId)`, `listMine()` — this last one is a student-only convenience endpoint; if T5 doesn't already expose `GET /api/grades/mine`, add it there as a one-line extension following T5's existing TDD pattern before consuming it here, since server-side scoping is the security boundary and must not be worked around client-side).
+- [ ] **Step 2:** Build `GradeCard.tsx` (Score X/100, Teacher Feedback block).
+- [ ] **Step 3:** Build `app/student/grades/page.tsx` listing every graded submission across the student's classes via `gradesApi.listMine()`.
+- [ ] **Step 4:** Update `app/student/assignments/[id]/page.tsx` to show `GradeCard` when a grade exists for the current student's submission, the `SubmissionForm` (from S1) otherwise.
+- [ ] **Step 5:** Manual check via `npm run dev`, seeded student login (use the `dev-login` route from P9), confirm grade+feedback renders for the seeded graded submission.
+- [ ] **Step 6: Commit**
+```bash
+git add apps/web/lib/api/grades.ts apps/web/app/student/grades/ apps/web/components/student/GradeCard.tsx apps/web/app/student/assignments/[id]/page.tsx
+git commit -m "feat: student grades UI"
+```
+
+---
+
+### Task S3: Component test sweep — Student
+
+**Files:**
+- Create/modify: `apps/web/tests/components/student/**`, `apps/web/tests/app/dashboard/layout.test.tsx`
+- Modify: `apps/web/vitest.config.ts` (coverage thresholds)
+
+**Interfaces:**
+- Consumes: nothing new — closes gaps across P10, S1, S2.
+
+- [ ] **Step 1:** Confirm `dashboard/layout.tsx`'s redirect-on-401 behavior has a test — if not, add `apps/web/tests/app/dashboard/layout.test.tsx` for it (spec §41 calls out "login/auth state" as a required component test).
+- [ ] **Step 2:** Set coverage thresholds in `apps/web/vitest.config.ts`:
+```typescript
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: "v8",
+      thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 },
+    },
+  },
+});
+```
+- [ ] **Step 3:** Run `npm run coverage --workspace=apps/web -- student`. Add test cases for every uncovered branch in `SubmissionForm`, `GradeCard`, `AssignmentDetail`, `Sidebar` — empty state, error state, loading state are the most commonly missed branches per spec §36.
+- [ ] **Step 4:** Re-run until 100% across all four metrics for every file this vertical owns.
+- [ ] **Step 5: Commit**
+```bash
+git add apps/web/tests/ apps/web/vitest.config.ts
+git commit -m "test: close student vertical coverage gaps to 100%"
+```
+
+---
+
+### Task S4: Playwright E2E — full stack
+
+**Files:**
+- Create: `e2e/playwright.config.ts`
+- Create: `e2e/fixtures/reset-db.ts`
+- Create: `e2e/golden-path.spec.ts`
+- Create: `e2e/negative-paths.spec.ts`
+
+**Interfaces:**
+- Consumes: the full docker-compose stack (P11) must be running (`docker compose up -d`); the `/auth/dev-login` route from P9.
+- Produces: `resetAndSeed(): Promise<void>` in `e2e/fixtures/reset-db.ts` — calls `packages/db`'s migrate+seed against the compose Postgres, run in Playwright's `globalSetup` so every test starts from the same deterministic state (never manually-prepared dev data, per spec §42).
+
+- [ ] **Step 1:** Write `e2e/playwright.config.ts` (`baseURL: "http://localhost"`, `globalSetup: "./fixtures/reset-db.ts"`, Chromium project — sufficient for the assessment's scope).
+- [ ] **Step 2:** Write `e2e/fixtures/reset-db.ts` shelling out to `packages/db`'s migrate+seed scripts (or importing `migrateToLatest`/seed functions directly) against `DATABASE_URL` pointed at the compose Postgres.
+- [ ] **Step 3:** Write `e2e/golden-path.spec.ts` implementing spec §42's 18-step flow: login as admin (via `POST /auth/dev-login` with `admin@example.com`) → create teacher (Admin UI, Task A4) → login as teacher (dev-login) → create Biology 101 (Teacher UI, Task T6) → add student (T6) → create assignment (T7) → publish (T7) → login as student (dev-login) → open class (S1) → open assignment (S1) → submit (S1) → login as teacher → open submissions (T8) → grade (T8) → add feedback (T8) → login as student → verify grade+feedback (S2) → verify stats page reflects the new average (Admin UI, Task A6).
+- [ ] **Step 4:** Write `e2e/negative-paths.spec.ts` covering spec §42's negative list: suspended student cannot submit (seed a suspended student via a direct DB call in the test setup, attempt submission, assert a visible error state); suspended teacher cannot grade; student navigating directly to `/admin/users` is redirected/blocked; teacher navigating to `/admin/users` is redirected/blocked; teacher A cannot modify teacher B's class via direct URL to the edit form; student cannot view another student's grade via direct URL manipulation.
+- [ ] **Step 5:** Run `npx playwright test` against the running compose stack. Expected: all steps in both spec files pass.
+- [ ] **Step 6: Commit**
+```bash
+git add e2e/
+git commit -m "test: playwright e2e golden path and negative authorization paths"
+```
+
+---
+
+## Track: Vraj — Admin Vertical
+
+*Tasks A1–A3 (backend) depend on Prateek's P1–P9 (schema, shared schemas/DTOs, `requireAuth`/`requireRole`, `db` singleton, redis plugin). Tasks A4–A6 (frontend) depend on P10 (base API client, app shell) and, per task, the specific A-task producing that resource's DTO. Follow the exact TDD/file pattern demonstrated in full for Task A1 — repeat it for A2 with the fields/routes specified.*
+
+### Task A1: Users module — Admin CRUD + suspension
 
 **Files:**
 - Create: `apps/api/src/modules/users/users.repository.ts`
@@ -943,7 +1098,7 @@ describe("POST /api/users", () => {
   });
 });
 ```
-*(Run this against a seeded test database — Vraj's local/CI setup runs `npm run migrate` + `npm run seed` against a dedicated `school_portal_test` DB before `npm run test`.)*
+*(Run this against a seeded test database — run `npm run migrate` + `npm run seed` against a dedicated `school_portal_test` DB before `npm run test`.)*
 - [ ] **Step 2:** Run `npm run test --workspace=apps/api -- users.routes.test.ts`. Expected: FAIL.
 - [ ] **Step 3:** Write `apps/api/src/modules/users/users.repository.ts`:
 ```typescript
@@ -968,7 +1123,7 @@ export function createUsersRepository(db: Kysely<DB>) {
 - [ ] **Step 5:** Write `apps/api/src/modules/users/users.routes.ts` as a Fastify plugin registering all 6 routes with `{ preHandler: [requireAuth, requireRole("admin")] }`, parsing bodies with `CreateUserSchema`/`UpdateUserSchema` via `schema.parse(request.body)`, returning `201` on create, `200` on read/update, `204` on delete/suspend/unsuspend.
 - [ ] **Step 6:** Register in `apps/api/src/app.ts`: `await app.register(usersRoutes, { prefix: "/api" });`.
 - [ ] **Step 7:** Run tests again. Expected: PASS.
-- [ ] **Step 8:** Add remaining route test cases to `users.routes.test.ts`: 401 unauthenticated, 404 unknown id, 409 duplicate email, suspend then verify `is_suspended: true` via a follow-up GET, unsuspend reverses it. Write `users.service.test.ts` unit-testing the service's NOT_FOUND/CONFLICT branches directly against an in-memory fake of the repository (plain object with vi.fn() methods) — no DB needed for this file.
+- [ ] **Step 8:** Add remaining route test cases to `users.routes.test.ts`: 401 unauthenticated, 404 unknown id, 409 duplicate email, suspend then verify `is_suspended: true` via a follow-up GET, unsuspend reverses it. Write `users.service.test.ts` unit-testing the service's NOT_FOUND/CONFLICT branches directly against an in-memory fake of the repository (plain object with `vi.fn()` methods) — no DB needed for this file.
 - [ ] **Step 9:** Run `npm run coverage --workspace=apps/api -- users` and confirm 100% on the three new files; add any missing branch cases.
 - [ ] **Step 10: Commit**
 ```bash
@@ -978,7 +1133,7 @@ git commit -m "feat: admin user management API"
 
 ---
 
-### Task V2: Teacher Groups module
+### Task A2: Teacher Groups module
 
 **Files:**
 - Create: `apps/api/src/modules/teacher-groups/{teacher-groups.repository.ts,teacher-groups.service.ts,teacher-groups.routes.ts}`
@@ -989,8 +1144,8 @@ git commit -m "feat: admin user management API"
 - Produces: `createTeacherGroupsRepository(db)` → `{findAll, findById, create, update, delete, addTeacher(groupId, teacherId), removeTeacher(groupId, teacherId)}`.
 - Routes (all admin-only via `requireRole("admin")`, spec §16): `GET/POST /api/teacher-groups`, `GET/PATCH/DELETE /api/teacher-groups/:id`, `POST/DELETE /api/teacher-groups/:id/teachers/:teacherId`.
 
-- [ ] **Step 1:** Following the exact TDD pattern from V1 Steps 1–2 (route test first, run to confirm failure), write `teacher-groups.routes.test.ts` covering: 403 non-admin on every route, 201 create, `POST .../teachers/:teacherId` adds a membership row and a follow-up `GET /api/teacher-groups/:id` reflects it (include the member in the response via a joined query), `DELETE .../teachers/:teacherId` removes it, 404 on unknown group/teacher id, `DELETE /api/teacher-groups/:id` cascades (verify membership rows are gone after — add `ON DELETE CASCADE` to migration 004 if not already present; if it isn't, that's a bug in P4 to fix as part of this task, not skip).
-- [ ] **Step 2:** Implement `teacher-groups.repository.ts`, `.service.ts` (404 on missing group/teacher, 409 on duplicate membership insert), `.routes.ts` following V1's plugin/schema-validation pattern exactly, using `CreateTeacherGroupSchema`/`UpdateTeacherGroupSchema` from `@school/shared`.
+- [ ] **Step 1:** Following the exact TDD pattern from A1 Steps 1–2 (route test first, run to confirm failure), write `teacher-groups.routes.test.ts` covering: 403 non-admin on every route, 201 create, `POST .../teachers/:teacherId` adds a membership row and a follow-up `GET /api/teacher-groups/:id` reflects it (include the member in the response via a joined query), `DELETE .../teachers/:teacherId` removes it, 404 on unknown group/teacher id, `DELETE /api/teacher-groups/:id` cascades (verify membership rows are gone after — the `ON DELETE CASCADE` on `teacher_group_members.teacher_group_id` was added in P4).
+- [ ] **Step 2:** Implement `teacher-groups.repository.ts`, `.service.ts` (404 on missing group/teacher, 409 on duplicate membership insert), `.routes.ts` following A1's plugin/schema-validation pattern exactly, using `CreateTeacherGroupSchema`/`UpdateTeacherGroupSchema` from `@school/shared`.
 - [ ] **Step 3:** Register in `app.ts`, run tests to green, run coverage, fill any gaps.
 - [ ] **Step 4: Commit**
 ```bash
@@ -1000,124 +1155,7 @@ git commit -m "feat: teacher groups CRUD + membership API"
 
 ---
 
-### Task V3: Classes module + ownership helper
-
-**Files:**
-- Create: `apps/api/src/modules/classes/{classes.repository.ts,classes.service.ts,classes.routes.ts}`
-- Create: `apps/api/src/modules/classes/ownership.ts`
-- Modify: `apps/api/src/app.ts`
-- Create: `apps/api/tests/modules/classes/*.test.ts`
-
-**Interfaces:**
-- Produces: `requireTeacherOwnsClass(userId: string, classId: string): Promise<void>` (throws `ApiError("FORBIDDEN", ...)` if `classes.teacher_id !== userId`, `ApiError("NOT_FOUND", ...)` if the class doesn't exist) — exported from `ownership.ts` for reuse by V4/V5 (enrollment and assignments both check class ownership).
-- Routes (spec §17): `GET /api/classes` (teacher: own classes via `WHERE teacher_id = request.user.id`; student: enrolled classes via join on `class_students`; admin: empty list unless a query param explicitly requests otherwise — per spec, don't grant broad admin access not in the assessment), `POST /api/classes` (teacher only, `teacher_id` forced to `request.user.id`, never trusted from body), `GET/PATCH/DELETE /api/classes/:id` (teacher mutations call `requireTeacherOwnsClass` first).
-
-- [ ] **Step 1:** Write `classes.routes.test.ts` first: teacher A creates a class → teacher B's `PATCH`/`DELETE` on it → 403; teacher A's own `PATCH` → 200; student's `GET /api/classes` only returns classes they're enrolled in (seed two classes, enroll the test student in one); `POST /api/classes` ignores any `teacherId` in the body and always uses the authenticated user's id (assert by trying to pass a different teacher's id in the payload and checking the created row's `teacher_id` is still the caller's).
-- [ ] **Step 2:** Run to confirm failure, then implement `ownership.ts`, `classes.repository.ts` (`findByTeacher`, `findByStudent` (join `class_students`), `findById`, `create`, `update`, `delete`), `.service.ts`, `.routes.ts` using `CreateClassSchema`/`UpdateClassSchema`.
-- [ ] **Step 3:** Register, run to green, coverage, fill gaps.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/api/src/modules/classes/ apps/api/src/app.ts apps/api/tests/modules/classes/
-git commit -m "feat: classes CRUD API with ownership enforcement"
-```
-
----
-
-### Task V4: Class enrollment module
-
-**Files:**
-- Create: `apps/api/src/modules/classes/enrollment.repository.ts`, `enrollment.routes.ts` (co-located under `modules/classes/` since it's the same resource family, per "files that change together live together")
-- Add to `ownership.ts`: `requireStudentEnrolledInClass`
-- Modify: `apps/api/src/app.ts`
-- Create: `apps/api/tests/modules/classes/enrollment.routes.test.ts`
-
-**Interfaces:**
-- Consumes: `requireTeacherOwnsClass` from `./ownership.ts` (Task V3).
-- Produces: `requireStudentEnrolledInClass(userId: string, classId: string): Promise<void>` — used later by V5 (assignments) and V6 (submissions).
-- Routes (spec §18, teacher-only mutations): `GET /api/classes/:id/students`, `POST/DELETE /api/classes/:id/students/:studentId` — each verifying `request.user.role === "teacher" && class.teacher_id === request.user.id` via `requireTeacherOwnsClass`.
-
-- [ ] **Step 1:** Write `enrollment.routes.test.ts`: non-owning teacher gets 403 on add/remove; owning teacher adds a student → `GET .../students` includes them; remove → they're gone; adding a student who's already enrolled → 409 (unique constraint on `class_students`).
-- [ ] **Step 2:** Confirm failure, implement `enrollment.repository.ts` (`listStudents(classId)`, `addStudent(classId, studentId)`, `removeStudent(classId, studentId)`) and `enrollment.routes.ts` reusing `requireTeacherOwnsClass`, add `requireStudentEnrolledInClass` to `ownership.ts`.
-- [ ] **Step 3:** Register, green, coverage.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/api/src/modules/classes/enrollment.repository.ts apps/api/src/modules/classes/enrollment.routes.ts apps/api/src/modules/classes/ownership.ts apps/api/src/app.ts apps/api/tests/modules/classes/enrollment.routes.test.ts
-git commit -m "feat: class enrollment API"
-```
-
----
-
-### Task V5: Assignments module + publish lifecycle
-
-**Files:**
-- Create: `apps/api/src/modules/assignments/{assignments.repository.ts,assignments.service.ts,assignments.routes.ts}`
-- Add to `apps/api/src/modules/classes/ownership.ts`: `requireTeacherOwnsAssignment`
-- Modify: `apps/api/src/app.ts`
-- Create: `apps/api/tests/modules/assignments/*.test.ts`
-
-**Interfaces:**
-- Consumes: `requireTeacherOwnsClass` (V3), `requireStudentEnrolledInClass` (V4).
-- Produces: `requireTeacherOwnsAssignment(userId, assignmentId)` (resolves the assignment's class, delegates to `requireTeacherOwnsClass`) — used by V6/V7.
-- Routes (spec §19): `GET/POST /api/classes/:classId/assignments`, `GET/PATCH/DELETE /api/assignments/:id`, `POST /api/assignments/:id/publish`. Students only ever see `published: true` rows on `GET`.
-
-- [ ] **Step 1:** Write `assignments.routes.test.ts`: student sees only published assignments in their enrolled class (seed one draft + one published, assert list length 1 and content matches published one); student not enrolled gets 403/empty depending on route (list endpoint: 403; direct `GET /api/assignments/:id` on an unpublished one they're not enrolled in: 404, don't leak existence); teacher creates a draft (`published: false` by default — verify `POST` never accepts a `published` field from the body, only `/publish` can flip it); non-owning teacher's `PATCH`/`DELETE`/`publish` → 403.
-- [ ] **Step 2:** Confirm failure, implement repository/service/routes using `CreateAssignmentSchema`/`UpdateAssignmentSchema` (both schemas deliberately have no `published` field — enforce that saving a draft is never equivalent to publishing per spec §19), a dedicated `publish(id)` repository method setting `published: true`.
-- [ ] **Step 3:** Register, green, coverage.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/api/src/modules/assignments/ apps/api/src/modules/classes/ownership.ts apps/api/src/app.ts apps/api/tests/modules/assignments/
-git commit -m "feat: assignments CRUD + publish lifecycle API"
-```
-
----
-
-### Task V6: Submissions module
-
-**Files:**
-- Create: `apps/api/src/modules/submissions/{submissions.repository.ts,submissions.service.ts,submissions.routes.ts}`
-- Add to `ownership.ts`: `requireStudentOwnsSubmission`, `requireTeacherOwnsSubmission`
-- Modify: `apps/api/src/app.ts`
-- Create: `apps/api/tests/modules/submissions/*.test.ts`
-
-**Interfaces:**
-- Consumes: `requireStudentEnrolledInClass` (V4), `requireTeacherOwnsAssignment` (V5).
-- Produces: `requireStudentOwnsSubmission(userId, submissionId)`, `requireTeacherOwnsSubmission(userId, submissionId)` (resolves submission → assignment → class → delegates to `requireTeacherOwnsClass`) — used by V7 (grades).
-- Routes (spec §20): `GET/POST/PATCH /api/assignments/:id/submission` (student, own submission only — `student_id` always forced to `request.user.id`), `GET /api/assignments/:id/submissions` (teacher, must own the assignment's class).
-
-- [ ] **Step 1:** Write `submissions.routes.test.ts`: unpublished assignment → `POST .../submission` 404/403 (assignment must be published — reject before enrollment check so students can't distinguish "not enrolled" from "not published" for classes they're not in); not-enrolled student → 403; enrolled student, published assignment → 201, second `POST` on same assignment → 409 (or route it through `PATCH` — implement `POST` as upsert-or-409 per spec's "one current submission" rule, `PATCH` as the explicit update path); `GET .../submissions` (teacher list) — non-owning teacher → 403, owning teacher → sees all students' submissions for that assignment.
-- [ ] **Step 2:** Confirm failure, implement using `CreateSubmissionSchema`, unique constraint from migration 008 backing the 409.
-- [ ] **Step 3:** Register, green, coverage.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/api/src/modules/submissions/ apps/api/src/modules/classes/ownership.ts apps/api/src/app.ts apps/api/tests/modules/submissions/
-git commit -m "feat: student submissions API"
-```
-
----
-
-### Task V7: Grades module
-
-**Files:**
-- Create: `apps/api/src/modules/grades/{grades.repository.ts,grades.service.ts,grades.routes.ts}`
-- Modify: `apps/api/src/app.ts`
-- Create: `apps/api/tests/modules/grades/*.test.ts`
-
-**Interfaces:**
-- Consumes: `requireTeacherOwnsSubmission`, `requireStudentOwnsSubmission` (V6).
-- Routes (spec §21): `POST/PATCH/GET /api/submissions/:id/grade` — teacher write requires owning the submission's class (via `requireTeacherOwnsSubmission`); student read requires owning the submission (via `requireStudentOwnsSubmission`).
-
-- [ ] **Step 1:** Write `grades.routes.test.ts`: non-owning teacher `POST` → 403; owning teacher `POST` → 201 with `score`/`feedback`; score outside `[0,100]` → 400 (Zod validation, matching `GradeSubmissionSchema`); `PATCH` updates an existing grade (upsert semantics — one grade per submission per the unique constraint on migration 009); student reading their own submission's grade → 200; student reading another student's grade → 403.
-- [ ] **Step 2:** Confirm failure, implement using `GradeSubmissionSchema`, `graded_by` forced to `request.user.id`, `graded_at` set server-side.
-- [ ] **Step 3:** Register, green, coverage.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/api/src/modules/grades/ apps/api/src/app.ts apps/api/tests/modules/grades/
-git commit -m "feat: grading API"
-```
-
----
-
-### Task V8: Statistics API + Redis caching
+### Task A3: Statistics API + Redis caching
 
 **Files:**
 - Create: `apps/api/src/modules/stats/{stats.repository.ts,stats.service.ts,stats.routes.ts}`
@@ -1126,104 +1164,22 @@ git commit -m "feat: grading API"
 
 **Interfaces:**
 - Consumes: `app.redis` (P8); `AverageGradeResponse`, `ClassListResponse`, `ClassStudentsResponse` DTO types from `@school/shared`.
-- Routes (spec §22, versioned `/api/v0/` prefix, all currently unauthenticated per the assessment brief's "external API" framing — no `requireAuth` preHandler, but every response must still be a DTO, never raw rows): `GET /api/v0/stats/average-grades`, `GET /api/v0/stats/average-grades/:id`, `GET /api/v0/stats/teacher-names`, `GET /api/v0/stats/student-names`, `GET /api/v0/stats/classes`, `GET /api/v0/stats/classes/:id`.
+- Routes (spec §22, versioned `/api/v0/` prefix, unauthenticated per the assessment brief's "external API" framing — no `requireAuth` preHandler, but every response must still be a DTO, never raw rows): `GET /api/v0/stats/average-grades`, `GET /api/v0/stats/average-grades/:id`, `GET /api/v0/stats/teacher-names`, `GET /api/v0/stats/student-names`, `GET /api/v0/stats/classes`, `GET /api/v0/stats/classes/:id`.
 
 - [ ] **Step 1:** Write `stats.routes.test.ts`: `average-grades` with no grades in a fresh class → `{averageGrade: null}` (not `0` — assert `toBeNull()` explicitly, not falsy); with the seeded graded submission → returns the correct average; `classes` list returns `{id, name, teacherName}[]` shape, no other fields (assert `Object.keys` on an item matches exactly `["id","name","teacherName"]`); `classes/:id` on unknown id → 404; second call to the same endpoint within the TTL window returns from cache (spy on the repository method with `vi.spyOn`, assert it was called exactly once across two requests).
-- [ ] **Step 2:** Confirm failure. Implement `stats.repository.ts` with raw aggregate queries (`avg(grades.score)` joined through submissions→assignments→classes, `count`/`null`-safe via Kysely's `.$if` or a plain `COALESCE` in SQL only where it clarifies null-vs-zero — the service layer, not SQL, is what returns `null`: `const row = await repo.avgForClass(id); return { averageGrade: row.avg === null ? null : Number(row.avg) };`).
-- [ ] **Step 3:** Implement caching in `stats.service.ts`: `const cacheKey = `stats:classes:${id ?? "all"}`; const cached = await redis.get(cacheKey); if (cached) return JSON.parse(cached); const result = await repo...; await redis.set(cacheKey, JSON.stringify(result), "EX", 45);` (45s TTL, within the spec's 30–60s guidance) for each of the 6 endpoints, keyed per spec §28's naming (`stats:average-grades`, `stats:average-grades:{classId}`, `stats:teacher-names`, `stats:student-names`, `stats:classes`, `stats:classes:{classId}`).
-- [ ] **Step 4:** Add cache invalidation: in `grades.service.ts` (V7) and `classes.service.ts` (V3), after a successful mutation, call a small exported `invalidateStatsCache(redis, keys: string[])` helper (define it in `stats.service.ts` and import it from V3/V7 — this is a legitimate cross-module dependency the spec's caching section calls for). Update V3/V7 accordingly as part of this task (they were left without invalidation when first written).
+- [ ] **Step 2:** Confirm failure. Implement `stats.repository.ts` with raw aggregate queries (`avg(grades.score)` joined through submissions→assignments→classes). The service layer, not SQL, is what returns `null`: `const row = await repo.avgForClass(id); return { averageGrade: row.avg === null ? null : Number(row.avg) };`.
+- [ ] **Step 3:** Implement caching in `stats.service.ts`: `const cacheKey = \`stats:classes:${id ?? "all"}\`; const cached = await redis.get(cacheKey); if (cached) return JSON.parse(cached); const result = await repo...; await redis.set(cacheKey, JSON.stringify(result), "EX", 45);` (45s TTL, within the spec's 30–60s guidance) for each of the 6 endpoints, keyed per spec §28's naming (`stats:average-grades`, `stats:average-grades:{classId}`, `stats:teacher-names`, `stats:student-names`, `stats:classes`, `stats:classes:{classId}`).
+- [ ] **Step 4:** Export a small `invalidateStatsCache(redis, keys: string[])` helper from `stats.service.ts`. Coordinate with Preksha (Teacher vertical): her **Task T5** (grades) and **Task T1** (classes) mutation handlers should call this after a successful write, so cached stats don't go stale. If T1/T5 land before this task, add the invalidation calls to those files as part of this task's Step 4 instead (whichever task lands second wires the other in — note it in the commit message either way).
 - [ ] **Step 5:** Register, green, coverage.
 - [ ] **Step 6: Commit**
 ```bash
-git add apps/api/src/modules/stats/ apps/api/src/modules/grades/grades.service.ts apps/api/src/modules/classes/classes.service.ts apps/api/src/app.ts apps/api/tests/modules/stats/
+git add apps/api/src/modules/stats/ apps/api/src/app.ts apps/api/tests/modules/stats/
 git commit -m "feat: statistics API with redis caching and invalidation"
 ```
 
 ---
 
-### Task V9: Backend coverage sweep
-
-**Files:**
-- Modify: any `apps/api/src/**` or `packages/**/src/**` file with uncovered branches
-- Modify: `apps/api/vitest.config.ts`, `packages/*/vitest.config.ts` (add coverage thresholds)
-
-**Interfaces:**
-- Consumes: nothing new — this task closes gaps across V1–V8's output.
-
-- [ ] **Step 1:** In each backend `vitest.config.ts`, set:
-```typescript
-export default defineConfig({
-  test: {
-    coverage: {
-      provider: "v8",
-      thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 },
-    },
-  },
-});
-```
-- [ ] **Step 2:** Run `npm run coverage --workspace=apps/api` and `npm run coverage --workspace=packages/db` and `npm run coverage --workspace=packages/shared` and `npm run coverage --workspace=packages/auth`.
-- [ ] **Step 3:** For every uncovered line/branch reported, add the missing test case (suspended-user branch, forbidden branch, not-found branch, validation-error branch, conflict branch — per spec §39's required branch list) to the relevant existing test file from V1–V8. No new files needed unless a whole module was missed.
-- [ ] **Step 4:** Re-run coverage until all four metrics report 100% in every backend workspace.
-- [ ] **Step 5: Commit**
-```bash
-git add apps/api/vitest.config.ts packages/*/vitest.config.ts apps/api/tests/ packages/*/tests/
-git commit -m "test: close coverage gaps to 100% across backend workspaces"
-```
-
----
-
-## Track: Preksha — Frontend & E2E
-
-*Depends on Prateek's P1, P6, P10 (workspace, shared DTOs, Next.js bootstrap + `apiFetch`) and, per-task, the specific Vraj task producing that resource's API.*
-
-### Task F1: App shell + role-aware navigation + auth guard
-
-**Files:**
-- Create: `apps/web/components/shell/Sidebar.tsx`, `apps/web/components/shell/TopBar.tsx`, `apps/web/components/shell/AppShell.tsx`
-- Create: `apps/web/lib/api/auth.ts`
-- Create: `apps/web/app/dashboard/layout.tsx`, `apps/web/app/dashboard/page.tsx`
-- Create: `apps/web/tests/components/shell/Sidebar.test.tsx`
-
-**Interfaces:**
-- Consumes: `apiFetch` (P10).
-- Produces: `authApi.me(): Promise<{id,name,email,role}>`, `authApi.logout(): Promise<void>` in `lib/api/auth.ts`; `<AppShell role={...}>` component every dashboard page (F2–F9) wraps its content in.
-
-- [ ] **Step 1: Write the failing test**
-```tsx
-// apps/web/tests/components/shell/Sidebar.test.tsx
-import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
-import { Sidebar } from "../../../components/shell/Sidebar";
-
-describe("Sidebar", () => {
-  it("shows admin nav items for admin role", () => {
-    render(<Sidebar role="admin" />);
-    expect(screen.getByRole("link", { name: /users/i })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /my classes/i })).not.toBeInTheDocument();
-  });
-
-  it("shows teacher nav items for teacher role", () => {
-    render(<Sidebar role="teacher" />);
-    expect(screen.getByRole("link", { name: /my classes/i })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /^users$/i })).not.toBeInTheDocument();
-  });
-});
-```
-- [ ] **Step 2:** Run `npm run test --workspace=apps/web -- Sidebar.test.tsx`. Expected: FAIL.
-- [ ] **Step 3:** Write `apps/web/components/shell/Sidebar.tsx` with a `NAV_BY_ROLE: Record<Role, {label: string; href: string}[]>` map matching spec §31 exactly (admin: Dashboard/Users/Teacher Groups/Statistics; teacher: Dashboard/My Classes/Assignments/Submissions/Statistics; student: Dashboard/My Classes/Assignments/Grades), rendering `<Link>` per entry.
-- [ ] **Step 4:** Run test again. Expected: PASS.
-- [ ] **Step 5:** Write `apps/web/lib/api/auth.ts` (`me`/`logout` wrapping `apiFetch`), `TopBar.tsx` (user name, role badge, logout button calling `authApi.logout()` then redirecting to `/login`), `AppShell.tsx` (composes `Sidebar` + `TopBar` + `children`).
-- [ ] **Step 6:** Write `apps/web/app/dashboard/layout.tsx` as a server component calling `authApi.me()` (via a server-side fetch forwarding cookies) — redirect to `/login` on 401, render `<AppShell role={user.role}>{children}</AppShell>` otherwise.
-- [ ] **Step 7:** Write a minimal `apps/web/app/dashboard/page.tsx` placeholder (empty state, filled in by F2–F9's own dashboard widgets if any — otherwise just a welcome message).
-- [ ] **Step 8: Commit**
-```bash
-git add apps/web/components/shell/ apps/web/lib/api/auth.ts apps/web/app/dashboard/ apps/web/tests/components/shell/
-git commit -m "feat: app shell, role-aware navigation, auth guard"
-```
-
----
-
-### Task F2: Admin — Users UI
+### Task A4: Admin — Users UI
 
 **Files:**
 - Create: `apps/web/lib/api/users.ts`
@@ -1231,7 +1187,7 @@ git commit -m "feat: app shell, role-aware navigation, auth guard"
 - Create: `apps/web/tests/components/users/UserTable.test.tsx`
 
 **Interfaces:**
-- Consumes: `apiFetch` (P10); depends on Vraj's **Task V1** for the `/api/users*` contract.
+- Consumes: `apiFetch` (P10). Depends on **Task A1** for the `/api/users*` contract.
 - Produces: `usersApi.{list,create,update,suspend,unsuspend,remove}` in `lib/api/users.ts`.
 
 - [ ] **Step 1:** Write `UserTable.test.tsx` (RTL, `screen.getByRole("table")`, columns Name/Email/Role/Status/Created/Actions per spec §32, an Edit/Suspend/Unsuspend/Delete button per row using `getByRole("button", {name: /suspend/i})` scoped to the row).
@@ -1245,18 +1201,18 @@ git commit -m "feat: admin user management UI"
 
 ---
 
-### Task F3: Admin — Teacher Groups UI
+### Task A5: Admin — Teacher Groups UI
 
 **Files:**
 - Create: `apps/web/lib/api/teacher-groups.ts`
 - Create: `apps/web/app/admin/teacher-groups/page.tsx`, `apps/web/app/admin/teacher-groups/[id]/page.tsx`, `apps/web/components/teacher-groups/GroupList.tsx`, `apps/web/components/teacher-groups/GroupFormDialog.tsx`, `apps/web/components/teacher-groups/MembershipManager.tsx`
 
 **Interfaces:**
-- Depends on Vraj's **Task V2**.
+- Depends on **Task A2**, and reuses `usersApi.list({role: "teacher"})` from **Task A4**.
 
 - [ ] **Step 1:** List page: group list, create dialog (name only, `CreateTeacherGroupSchema`), each row links to detail.
-- [ ] **Step 2:** Detail page: group info, edit, delete (confirmation dialog), `MembershipManager` (add/remove teacher — a searchable select populated from `usersApi.list({role: "teacher"})` from Task F2, plus a remove button per current member).
-- [ ] **Step 3:** All list/detail views implement loading/empty/error states matching F2's pattern.
+- [ ] **Step 2:** Detail page: group info, edit, delete (confirmation dialog), `MembershipManager` (add/remove teacher — a searchable select populated from `usersApi.list({role: "teacher"})`, plus a remove button per current member).
+- [ ] **Step 3:** All list/detail views implement loading/empty/error states matching A4's pattern.
 - [ ] **Step 4:** Manual check: `npm run dev`, walk through create → add 2 teachers → remove 1 → delete group.
 - [ ] **Step 5: Commit**
 ```bash
@@ -1266,113 +1222,7 @@ git commit -m "feat: admin teacher groups UI"
 
 ---
 
-### Task F4: Teacher — Classes UI
-
-**Files:**
-- Create: `apps/web/lib/api/classes.ts`
-- Create: `apps/web/app/teacher/classes/page.tsx`, `apps/web/app/teacher/classes/[id]/page.tsx`, `apps/web/components/classes/ClassCard.tsx`, `apps/web/components/classes/ClassFormDialog.tsx`, `apps/web/components/classes/StudentRoster.tsx`
-- Create: `apps/web/tests/components/classes/ClassFormDialog.test.tsx`
-
-**Interfaces:**
-- Depends on Vraj's **Task V3** (classes) and **Task V4** (enrollment).
-
-- [ ] **Step 1:** Write `ClassFormDialog.test.tsx` (RTL: submit with empty name shows a field error and does not call the create handler; valid submit calls it with the trimmed payload).
-- [ ] **Step 2:** Confirm failure, implement `lib/api/classes.ts` (`list`, `create`, `update`, `remove`, `listStudents`, `addStudent`, `removeStudent`), list page (`ClassCard` per class: name/description/student count/assignment count/actions per spec §33), detail page (class info, `StudentRoster` — name/email/remove per row, "Add student" search-select, assignments list stub linking to F5).
-- [ ] **Step 3:** Run to green.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/web/lib/api/classes.ts apps/web/app/teacher/classes/ apps/web/components/classes/ apps/web/tests/components/classes/
-git commit -m "feat: teacher classes UI"
-```
-
----
-
-### Task F5: Teacher — Assignments UI
-
-**Files:**
-- Create: `apps/web/lib/api/assignments.ts`
-- Create: `apps/web/app/teacher/classes/[id]/assignments/[assignmentId]/page.tsx`, `apps/web/components/assignments/AssignmentFormDialog.tsx`, `apps/web/components/assignments/AssignmentList.tsx`
-- Create: `apps/web/tests/components/assignments/AssignmentFormDialog.test.tsx`
-
-**Interfaces:**
-- Depends on Vraj's **Task V5**.
-
-- [ ] **Step 1:** Write `AssignmentFormDialog.test.tsx` (RTL: "Save draft" button calls `create`/`update` without touching publish state; "Publish" button is a visibly distinct, separate action — assert two different buttons exist via `getByRole("button", {name: /save draft/i})` and `getByRole("button", {name: /publish/i})`, matching spec §33/§19's "saving and publishing are distinct operations").
-- [ ] **Step 2:** Confirm failure, implement `lib/api/assignments.ts` (`list`, `create`, `update`, `remove`, `publish`), `AssignmentFormDialog.tsx` (Title/Description/Due date fields, `CreateAssignmentSchema`, Save draft calls `create`/`update`, Publish calls `create`/`update` then `publish` as a second explicit call — never bundled into one request), `AssignmentList.tsx` (title/status badge/due date/actions per spec §33).
-- [ ] **Step 3:** Run to green.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/web/lib/api/assignments.ts apps/web/app/teacher/classes/[id]/assignments/ apps/web/components/assignments/ apps/web/tests/components/assignments/
-git commit -m "feat: teacher assignment CRUD + publish UI"
-```
-
----
-
-### Task F6: Teacher — Grading UI
-
-**Files:**
-- Create: `apps/web/lib/api/submissions.ts`, `apps/web/lib/api/grades.ts`
-- Create: `apps/web/app/teacher/assignments/[id]/submissions/page.tsx`, `apps/web/components/grading/SubmissionList.tsx`, `apps/web/components/grading/GradeForm.tsx`
-- Create: `apps/web/tests/components/grading/GradeForm.test.tsx`
-
-**Interfaces:**
-- Depends on Vraj's **Task V6** (submissions) and **Task V7** (grades).
-
-- [ ] **Step 1:** Write `GradeForm.test.tsx` (RTL: score input rejects non-numeric/out-of-range via field error before submit — mirrors `GradeSubmissionSchema`'s `min(0).max(100)`; "Save Grade" disabled while a request is pending).
-- [ ] **Step 2:** Confirm failure, implement `lib/api/submissions.ts` (`listForAssignment`, `getMine`, `create`, `update`), `lib/api/grades.ts` (`get`, `create`, `update`), page listing each student's submission content with a `GradeForm` (Score input, Feedback textarea, Save Grade button) per spec §34 — teacher only ever sees submissions for assignments they own (route guarded server-side already by V6/V7; client just calls the API and surfaces the 403 as an error state if it somehow gets one).
-- [ ] **Step 3:** Run to green.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/web/lib/api/submissions.ts apps/web/lib/api/grades.ts apps/web/app/teacher/assignments/ apps/web/components/grading/ apps/web/tests/components/grading/
-git commit -m "feat: teacher grading UI"
-```
-
----
-
-### Task F7: Student — Classes/Assignments/Submission UI
-
-**Files:**
-- Create: `apps/web/app/student/classes/page.tsx`, `apps/web/app/student/classes/[id]/page.tsx`, `apps/web/app/student/assignments/[id]/page.tsx`
-- Create: `apps/web/components/student/AssignmentDetail.tsx`, `apps/web/components/student/SubmissionForm.tsx`
-- Create: `apps/web/tests/components/student/SubmissionForm.test.tsx`
-
-**Interfaces:**
-- Reuses `classesApi` (F4), `assignmentsApi` (F5), `submissionsApi` (F6). Depends on Vraj's **Task V4** and **V6**.
-
-- [ ] **Step 1:** Write `SubmissionForm.test.tsx` (RTL: empty content shows a field error, matching `CreateSubmissionSchema`'s `min(1)`; successful submit shows a success confirmation and disables further edits to that field — or switches to an "update" mode, per how V6 implemented `PATCH`).
-- [ ] **Step 2:** Confirm failure, implement: classes list page (enrolled classes only, calls `classesApi.list()` which already scopes by role server-side), class detail (published assignments only — again server-scoped), `AssignmentDetail.tsx` (Title/Description/Due date per spec §35), `SubmissionForm.tsx` (textarea + Submit Assignment button).
-- [ ] **Step 3:** Run to green.
-- [ ] **Step 4: Commit**
-```bash
-git add apps/web/app/student/ apps/web/components/student/AssignmentDetail.tsx apps/web/components/student/SubmissionForm.tsx apps/web/tests/components/student/
-git commit -m "feat: student classes/assignments/submission UI"
-```
-
----
-
-### Task F8: Student — Grades UI
-
-**Files:**
-- Create: `apps/web/app/student/grades/page.tsx`
-- Create: `apps/web/components/student/GradeCard.tsx`
-- Modify: `apps/web/app/student/assignments/[id]/page.tsx` (show grade + feedback after grading, per spec §35)
-
-**Interfaces:**
-- Depends on Vraj's **Task V7**.
-
-- [ ] **Step 1:** Implement `grades.ts` client already exists from F6 — reuse `gradesApi.get`. Build `GradeCard.tsx` (Score X/100, Teacher Feedback block).
-- [ ] **Step 2:** `app/student/grades/page.tsx` lists all of the student's graded submissions across classes (a small aggregate query — add `gradesApi.listMine()` to `lib/api/grades.ts` if the backend doesn't already expose it; if it doesn't, that's a gap to flag to Vraj rather than build a workaround, since server-side scoping is the security boundary — add the missing `GET /api/grades/mine` route as a one-line addition to V7's routes file with the same TDD pattern, then consume it here).
-- [ ] **Step 3:** Update the assignment detail page (F7) to show `GradeCard` when a grade exists, the submission form otherwise.
-- [ ] **Step 4:** Manual check via `npm run dev`, seeded student login, confirm grade+feedback renders for the seeded graded submission.
-- [ ] **Step 5: Commit**
-```bash
-git add apps/web/app/student/grades/ apps/web/components/student/GradeCard.tsx apps/web/app/student/assignments/[id]/page.tsx apps/web/lib/api/grades.ts
-git commit -m "feat: student grades UI"
-```
-
----
-
-### Task F9: Statistics UI
+### Task A6: Statistics UI
 
 **Files:**
 - Create: `apps/web/lib/api/stats.ts`
@@ -1380,10 +1230,10 @@ git commit -m "feat: student grades UI"
 - Create: `apps/web/components/stats/StatsSummary.tsx`
 
 **Interfaces:**
-- Depends on Vraj's **Task V8**.
+- Depends on **Task A3**.
 
-- [ ] **Step 1:** Implement `lib/api/stats.ts` (`averageGrades()`, `averageGradesForClass(id)`, `teacherNames()`, `studentNames()`, `classes()`, `classStudents(id)`), rendering a simple summary (overall average, per-class breakdown table, teacher/student counts) reachable from every role's nav per spec §31 ("Statistics" appears for admin and teacher; student nav omits it — only render the nav link for admin/teacher in `Sidebar.tsx` from F1, but leave the route itself accessible since the stats API is unauthenticated per V8).
-- [ ] **Step 2:** Handle `averageGrade: null` explicitly in the UI (render "No grades yet" instead of "0" or blank — this is the one place a client bug could silently misrepresent the null/zero distinction the backend went out of its way to preserve).
+- [ ] **Step 1:** Implement `lib/api/stats.ts` (`averageGrades()`, `averageGradesForClass(id)`, `teacherNames()`, `studentNames()`, `classes()`, `classStudents(id)`), rendering a simple summary (overall average, per-class breakdown table, teacher/student counts) reachable from admin and teacher nav per spec §31 (the `Sidebar` from P10 already omits it for students).
+- [ ] **Step 2:** Handle `averageGrade: null` explicitly in the UI (render "No grades yet" instead of "0" or blank).
 - [ ] **Step 3:** Manual check via `npm run dev`.
 - [ ] **Step 4: Commit**
 ```bash
@@ -1393,73 +1243,287 @@ git commit -m "feat: statistics UI"
 
 ---
 
-### Task F10: Component test sweep
+### Task A7: Admin vertical coverage sweep
 
 **Files:**
-- Create/modify: `apps/web/tests/components/**` for any of the 8 components spec §41 calls out that aren't yet covered by F1–F9's own test steps (login/auth state, user table, class form, assignment form, submission form, grade form, suspend/unsuspend dialog, role-based navigation)
-- Modify: `apps/web/vitest.config.ts` (coverage thresholds, same shape as V9's backend config)
+- Modify: any `apps/api/src/modules/{users,teacher-groups,stats}/**` or `apps/web/{lib/api/{users,teacher-groups,stats}.ts,components/{users,teacher-groups,stats}/**}` file with uncovered branches
 
 **Interfaces:**
-- Consumes: nothing new — closes gaps across F1–F9.
+- Consumes: nothing new — closes gaps across A1–A6. Backend thresholds were already configured globally in `apps/api/vitest.config.ts` if Preksha's T9 lands first; if this task lands first, set them here (same shape as shown in T9/S3).
 
-- [ ] **Step 1:** Cross-check spec §41's list against what F1–F9 already wrote tests for. `Sidebar` (F1, role nav) ✓, `UserFormDialog`/`UserTable`/`SuspendDialog` (F2) ✓, `ClassFormDialog` (F4) ✓, `AssignmentFormDialog` (F5) ✓, `GradeForm` (F6) ✓, `SubmissionForm` (F7) ✓. Confirm "login/auth state" has a test — if `dashboard/layout.tsx`'s redirect-on-401 behavior wasn't tested in F1, add `apps/web/tests/app/dashboard/layout.test.tsx` for it now.
-- [ ] **Step 2:** Set coverage thresholds in `apps/web/vitest.config.ts` to 100 (same shape as V9).
-- [ ] **Step 3:** Run `npm run coverage --workspace=apps/web`, add test cases for every uncovered branch (empty state, error state, loading state per component — these are the most commonly missed branches per spec §36).
-- [ ] **Step 4:** Re-run until 100% across all four metrics.
-- [ ] **Step 5: Commit**
+- [ ] **Step 1:** Run `npm run coverage --workspace=apps/api -- users teacher-groups stats` and `npm run coverage --workspace=apps/web -- users teacher-groups stats`.
+- [ ] **Step 2:** For every uncovered line/branch reported, add the missing test case (forbidden branch, not-found branch, validation-error branch, conflict branch, cache-hit branch — per spec §39's required branch list) to the relevant existing test file from A1–A6.
+- [ ] **Step 3:** Re-run coverage until all four metrics report 100% for every file this vertical owns.
+- [ ] **Step 4: Commit**
 ```bash
-git add apps/web/tests/ apps/web/vitest.config.ts
-git commit -m "test: close component test coverage gaps to 100%"
+git add apps/api/tests/modules/users/ apps/api/tests/modules/teacher-groups/ apps/api/tests/modules/stats/ apps/web/tests/components/users/ apps/web/tests/components/teacher-groups/ apps/web/tests/components/stats/
+git commit -m "test: close admin vertical coverage gaps to 100%"
 ```
 
 ---
 
-### Task F11: Playwright E2E — golden path
+## Track: Preksha — Teacher Vertical
+
+*Tasks T1–T5 (backend) depend on Prateek's P1–P9. Tasks T6–T8 (frontend) depend on P10 and, per task, the specific T-task producing that resource's DTO. Follow the exact TDD/file pattern demonstrated in full for Task T1 — repeat it for T2–T5 with the fields/routes specified.*
+
+### Task T1: Classes module + ownership helper
 
 **Files:**
-- Create: `e2e/playwright.config.ts`
-- Create: `e2e/fixtures/reset-db.ts`
-- Create: `e2e/golden-path.spec.ts`
+- Create: `apps/api/src/modules/classes/{classes.repository.ts,classes.service.ts,classes.routes.ts}`
+- Create: `apps/api/src/modules/classes/ownership.ts`
+- Modify: `apps/api/src/app.ts`
+- Create: `apps/api/tests/modules/classes/*.test.ts`
 
 **Interfaces:**
-- Consumes: the full docker-compose stack (P11) must be running (`docker compose up -d`).
-- Produces: `resetAndSeed(): Promise<void>` in `e2e/fixtures/reset-db.ts` — calls `packages/db`'s migrate+seed against the compose Postgres, run in Playwright's `globalSetup`/`beforeEach` so every test starts from the same deterministic state (never manually-prepared dev data, per spec §42).
+- Produces: `requireTeacherOwnsClass(userId: string, classId: string): Promise<void>` (throws `ApiError("FORBIDDEN", ...)` if `classes.teacher_id !== userId`, `ApiError("NOT_FOUND", ...)` if the class doesn't exist) — exported from `ownership.ts` for reuse by T2/T3 (enrollment and assignments both check class ownership).
+- Routes (spec §17): `GET /api/classes` (teacher: own classes via `WHERE teacher_id = request.user.id`; student: enrolled classes via join on `class_students`; admin: empty list unless a query param explicitly requests otherwise — per spec, don't grant broad admin access not in the assessment), `POST /api/classes` (teacher only, `teacher_id` forced to `request.user.id`, never trusted from body), `GET/PATCH/DELETE /api/classes/:id` (teacher mutations call `requireTeacherOwnsClass` first).
 
-- [ ] **Step 1:** Write `e2e/playwright.config.ts` (`baseURL: "http://localhost"`, `globalSetup: "./fixtures/reset-db.ts"`, one project per browser or just Chromium for the assessment's scope).
-- [ ] **Step 2:** Write `e2e/fixtures/reset-db.ts` shelling out to `packages/db`'s migrate+seed scripts (or importing `migrateToLatest`/seed functions directly) against `DATABASE_URL` pointed at the compose Postgres.
-- [ ] **Step 3:** Write `e2e/golden-path.spec.ts` implementing spec §42's 18-step flow: login as admin (via the seeded `admin@example.com` — for E2E, add a test-only backdoor login route gated behind `NODE_ENV !== "production"` in `auth.routes.ts`, since driving real Google OAuth in CI isn't practical; flag this as a coordinated change with Prateek's P9 rather than adding it unilaterally) → create teacher → login as teacher → create Biology 101 → add student → create assignment → publish → login as student → open class → open assignment → submit → login as teacher → open submissions → grade → add feedback → login as student → verify grade+feedback → verify stats page reflects the new average.
-- [ ] **Step 4:** Run `npx playwright test golden-path.spec.ts` against the running compose stack. Expected: all steps pass.
+- [ ] **Step 1: Write the failing test**
+```typescript
+// apps/api/tests/modules/classes/classes.routes.test.ts
+import { describe, it, expect } from "vitest";
+import { buildApp } from "../../../src/app.js";
+import { db } from "../../../src/db.js";
+import { signJwt } from "@school/auth/jwt";
+import { env } from "../../../src/config/env.js";
+import { AUTH_COOKIE_NAME } from "@school/auth/cookies";
+
+async function loginAs(email: string) {
+  const user = await db.selectFrom("users").selectAll().where("email", "=", email).executeTakeFirstOrThrow();
+  return { cookie: signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET), user };
+}
+
+describe("Classes ownership", () => {
+  it("403s when a teacher edits another teacher's class", async () => {
+    const app = await buildApp();
+    const { cookie: teacherACookie } = await loginAs("teacher@example.com");
+    const createRes = await app.inject({
+      method: "POST",
+      url: "/api/classes",
+      cookies: { [AUTH_COOKIE_NAME]: teacherACookie },
+      payload: { name: "Chemistry 101" },
+    });
+    const classId = createRes.json().id;
+
+    const { cookie: teacherBCookie } = await loginAs("teacher2@example.com");
+    const res = await app.inject({
+      method: "PATCH",
+      url: `/api/classes/${classId}`,
+      cookies: { [AUTH_COOKIE_NAME]: teacherBCookie },
+      payload: { name: "Hijacked" },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+});
+```
+- [ ] **Step 2:** Run to confirm failure. Add further cases: `POST /api/classes` ignores any `teacherId` in the body and always uses the authenticated user's id (assert the created row's `teacher_id` is the caller's even when a different id is passed in the payload); student's `GET /api/classes` only returns classes they're enrolled in (seed two classes, enroll the test student in one, assert length 1).
+- [ ] **Step 3:** Implement `ownership.ts`, `classes.repository.ts` (`findByTeacher`, `findByStudent` (join `class_students`), `findById`, `create`, `update`, `delete`), `.service.ts`, `.routes.ts` using `CreateClassSchema`/`UpdateClassSchema`.
+- [ ] **Step 4:** Register, run to green, coverage, fill gaps.
 - [ ] **Step 5: Commit**
 ```bash
-git add e2e/playwright.config.ts e2e/fixtures/reset-db.ts e2e/golden-path.spec.ts
-git commit -m "test: playwright e2e golden path"
+git add apps/api/src/modules/classes/classes.repository.ts apps/api/src/modules/classes/classes.service.ts apps/api/src/modules/classes/classes.routes.ts apps/api/src/modules/classes/ownership.ts apps/api/src/app.ts apps/api/tests/modules/classes/
+git commit -m "feat: classes CRUD API with ownership enforcement"
 ```
 
 ---
 
-### Task F12: Playwright E2E — negative auth paths
+### Task T2: Class enrollment module
 
 **Files:**
-- Create: `e2e/negative-paths.spec.ts`
+- Create: `apps/api/src/modules/classes/enrollment.repository.ts`, `enrollment.routes.ts`
+- Add to `ownership.ts`: `requireStudentEnrolledInClass`
+- Modify: `apps/api/src/app.ts`
+- Create: `apps/api/tests/modules/classes/enrollment.routes.test.ts`
 
 **Interfaces:**
-- Consumes: `resetAndSeed` (F11).
+- Consumes: `requireTeacherOwnsClass` from `./ownership.ts` (Task T1).
+- Produces: `requireStudentEnrolledInClass(userId: string, classId: string): Promise<void>` — used later by T3 (assignments) and T4 (submissions).
+- Routes (spec §18, teacher-only mutations): `GET /api/classes/:id/students`, `POST/DELETE /api/classes/:id/students/:studentId` — each verifying `request.user.role === "teacher" && class.teacher_id === request.user.id` via `requireTeacherOwnsClass`.
 
-- [ ] **Step 1:** Write `e2e/negative-paths.spec.ts` covering spec §42's negative list: suspended student cannot submit (seed a suspended student, attempt submission, assert a visible error state, not a silent failure); suspended teacher cannot grade; student navigating directly to `/admin/users` is redirected/blocked; teacher navigating to `/admin/users` is redirected/blocked; teacher A cannot modify teacher B's class (attempt via direct URL to the edit form, assert error); student cannot view another student's grade via direct URL manipulation.
-- [ ] **Step 2:** Run `npx playwright test negative-paths.spec.ts`. Expected: all pass.
-- [ ] **Step 3: Commit**
+- [ ] **Step 1:** Write `enrollment.routes.test.ts`: non-owning teacher gets 403 on add/remove; owning teacher adds a student → `GET .../students` includes them; remove → they're gone; adding a student who's already enrolled → 409 (unique constraint on `class_students`).
+- [ ] **Step 2:** Confirm failure, implement `enrollment.repository.ts` (`listStudents(classId)`, `addStudent(classId, studentId)`, `removeStudent(classId, studentId)`) and `enrollment.routes.ts` reusing `requireTeacherOwnsClass`, add `requireStudentEnrolledInClass` to `ownership.ts`.
+- [ ] **Step 3:** Register, green, coverage.
+- [ ] **Step 4: Commit**
 ```bash
-git add e2e/negative-paths.spec.ts
-git commit -m "test: playwright e2e negative authorization paths"
+git add apps/api/src/modules/classes/enrollment.repository.ts apps/api/src/modules/classes/enrollment.routes.ts apps/api/src/modules/classes/ownership.ts apps/api/src/app.ts apps/api/tests/modules/classes/enrollment.routes.test.ts
+git commit -m "feat: class enrollment API"
+```
+
+---
+
+### Task T3: Assignments module + publish lifecycle
+
+**Files:**
+- Create: `apps/api/src/modules/assignments/{assignments.repository.ts,assignments.service.ts,assignments.routes.ts}`
+- Add to `apps/api/src/modules/classes/ownership.ts`: `requireTeacherOwnsAssignment`
+- Modify: `apps/api/src/app.ts`
+- Create: `apps/api/tests/modules/assignments/*.test.ts`
+
+**Interfaces:**
+- Consumes: `requireTeacherOwnsClass` (T1), `requireStudentEnrolledInClass` (T2).
+- Produces: `requireTeacherOwnsAssignment(userId, assignmentId)` (resolves the assignment's class, delegates to `requireTeacherOwnsClass`) — used by T4/T5.
+- Routes (spec §19): `GET/POST /api/classes/:classId/assignments`, `GET/PATCH/DELETE /api/assignments/:id`, `POST /api/assignments/:id/publish`. Students only ever see `published: true` rows on `GET`.
+
+- [ ] **Step 1:** Write `assignments.routes.test.ts`: student sees only published assignments in their enrolled class (seed one draft + one published, assert list length 1 and content matches published one); student not enrolled gets 403/empty depending on route (list endpoint: 403; direct `GET /api/assignments/:id` on an unpublished one they're not enrolled in: 404, don't leak existence); teacher creates a draft (`published: false` by default — verify `POST` never accepts a `published` field from the body, only `/publish` can flip it); non-owning teacher's `PATCH`/`DELETE`/`publish` → 403.
+- [ ] **Step 2:** Confirm failure, implement repository/service/routes using `CreateAssignmentSchema`/`UpdateAssignmentSchema` (both schemas deliberately have no `published` field — enforce that saving a draft is never equivalent to publishing per spec §19), a dedicated `publish(id)` repository method setting `published: true`.
+- [ ] **Step 3:** Register, green, coverage.
+- [ ] **Step 4: Commit**
+```bash
+git add apps/api/src/modules/assignments/ apps/api/src/modules/classes/ownership.ts apps/api/src/app.ts apps/api/tests/modules/assignments/
+git commit -m "feat: assignments CRUD + publish lifecycle API"
+```
+
+---
+
+### Task T4: Submissions module (student create/update + teacher list)
+
+**Files:**
+- Create: `apps/api/src/modules/submissions/{submissions.repository.ts,submissions.service.ts,submissions.routes.ts}`
+- Add to `ownership.ts`: `requireStudentOwnsSubmission`, `requireTeacherOwnsSubmission`
+- Modify: `apps/api/src/app.ts`
+- Create: `apps/api/tests/modules/submissions/*.test.ts`
+
+**Interfaces:**
+- Consumes: `requireStudentEnrolledInClass` (T2), `requireTeacherOwnsAssignment` (T3).
+- Produces: `requireStudentOwnsSubmission(userId, submissionId)`, `requireTeacherOwnsSubmission(userId, submissionId)` (resolves submission → assignment → class → delegates to `requireTeacherOwnsClass`) — used by T5 (grades).
+- Routes (spec §20 — both student-facing and teacher-facing routes live in this one module, since they operate on the same table and splitting them across two people would only create merge friction): `GET/POST/PATCH /api/assignments/:id/submission` (student, own submission only — `student_id` always forced to `request.user.id`), `GET /api/assignments/:id/submissions` (teacher, must own the assignment's class).
+
+- [ ] **Step 1:** Write `submissions.routes.test.ts`: unpublished assignment → `POST .../submission` 404/403 (assignment must be published — reject before enrollment check so students can't distinguish "not enrolled" from "not published" for classes they're not in); not-enrolled student → 403; enrolled student, published assignment → 201, second `POST` on same assignment → 409 (implement `POST` as create-or-409 per spec's "one current submission" rule, `PATCH` as the explicit update path); `GET .../submissions` (teacher list) — non-owning teacher → 403, owning teacher → sees all students' submissions for that assignment.
+- [ ] **Step 2:** Confirm failure, implement using `CreateSubmissionSchema`, unique constraint from migration 008 backing the 409.
+- [ ] **Step 3:** Register, green, coverage.
+- [ ] **Step 4: Commit**
+```bash
+git add apps/api/src/modules/submissions/ apps/api/src/modules/classes/ownership.ts apps/api/src/app.ts apps/api/tests/modules/submissions/
+git commit -m "feat: submissions API (student create/update + teacher list)"
+```
+
+---
+
+### Task T5: Grades module
+
+**Files:**
+- Create: `apps/api/src/modules/grades/{grades.repository.ts,grades.service.ts,grades.routes.ts}`
+- Modify: `apps/api/src/app.ts`
+- Create: `apps/api/tests/modules/grades/*.test.ts`
+
+**Interfaces:**
+- Consumes: `requireTeacherOwnsSubmission`, `requireStudentOwnsSubmission` (T4).
+- Routes (spec §21): `POST/PATCH/GET /api/submissions/:id/grade` — teacher write requires owning the submission's class (via `requireTeacherOwnsSubmission`); student read requires owning the submission (via `requireStudentOwnsSubmission`). Also add `GET /api/grades/mine` (student-only, lists every grade for the caller's own submissions across all classes) — Prateek's Student vertical (**Task S2**) consumes this.
+
+- [ ] **Step 1:** Write `grades.routes.test.ts`: non-owning teacher `POST` → 403; owning teacher `POST` → 201 with `score`/`feedback`; score outside `[0,100]` → 400 (Zod validation, matching `GradeSubmissionSchema`); `PATCH` updates an existing grade (upsert semantics — one grade per submission per the unique constraint on migration 009); student reading their own submission's grade → 200; student reading another student's grade → 403; `GET /api/grades/mine` returns only the caller's own graded submissions, shape `{grades: {submissionId, assignmentTitle, className, score, feedback}[]}`.
+- [ ] **Step 2:** Confirm failure, implement using `GradeSubmissionSchema`, `graded_by` forced to `request.user.id`, `graded_at` set server-side.
+- [ ] **Step 3:** Wire cache invalidation: after a successful grade create/update, call `invalidateStatsCache` from `apps/api/src/modules/stats/stats.service.ts` (Vraj's **Task A3**) for the `stats:average-grades` and `stats:average-grades:{classId}` keys. If A3 hasn't landed yet when you reach this step, leave a one-line `// TODO(A3): invalidate stats cache here` and circle back once it has — don't block this task on it.
+- [ ] **Step 4:** Register, green, coverage.
+- [ ] **Step 5: Commit**
+```bash
+git add apps/api/src/modules/grades/ apps/api/src/app.ts apps/api/tests/modules/grades/
+git commit -m "feat: grading API + student's own-grades listing"
+```
+
+---
+
+### Task T6: Teacher — Classes UI
+
+**Files:**
+- Create: `apps/web/lib/api/classes.ts` (skip if Prateek's **Task S1** already created it — coordinate; whichever lands first owns the file, the other extends it)
+- Create: `apps/web/app/teacher/classes/page.tsx`, `apps/web/app/teacher/classes/[id]/page.tsx`, `apps/web/components/classes/ClassCard.tsx`, `apps/web/components/classes/ClassFormDialog.tsx`, `apps/web/components/classes/StudentRoster.tsx`
+- Create: `apps/web/tests/components/classes/ClassFormDialog.test.tsx`
+
+**Interfaces:**
+- Depends on **Task T1** (classes) and **Task T2** (enrollment).
+
+- [ ] **Step 1:** Write `ClassFormDialog.test.tsx` (RTL: submit with empty name shows a field error and does not call the create handler; valid submit calls it with the trimmed payload).
+- [ ] **Step 2:** Confirm failure, implement `lib/api/classes.ts` (`list`, `create`, `update`, `remove`, `listStudents`, `addStudent`, `removeStudent` — reuse from S1 if it exists, add the teacher-only methods if it doesn't have them yet), list page (`ClassCard` per class: name/description/student count/assignment count/actions per spec §33), detail page (class info, `StudentRoster` — name/email/remove per row, "Add student" search-select, assignments list stub linking to T7).
+- [ ] **Step 3:** Run to green.
+- [ ] **Step 4: Commit**
+```bash
+git add apps/web/lib/api/classes.ts apps/web/app/teacher/classes/ apps/web/components/classes/ apps/web/tests/components/classes/
+git commit -m "feat: teacher classes UI"
+```
+
+---
+
+### Task T7: Teacher — Assignments UI
+
+**Files:**
+- Create: `apps/web/lib/api/assignments.ts` (skip if **Task S1** already created it — extend instead)
+- Create: `apps/web/app/teacher/classes/[id]/assignments/[assignmentId]/page.tsx`, `apps/web/components/assignments/AssignmentFormDialog.tsx`, `apps/web/components/assignments/AssignmentList.tsx`
+- Create: `apps/web/tests/components/assignments/AssignmentFormDialog.test.tsx`
+
+**Interfaces:**
+- Depends on **Task T3**.
+
+- [ ] **Step 1:** Write `AssignmentFormDialog.test.tsx` (RTL: "Save draft" button calls `create`/`update` without touching publish state; "Publish" button is a visibly distinct, separate action — assert two different buttons exist via `getByRole("button", {name: /save draft/i})` and `getByRole("button", {name: /publish/i})`, matching spec §33/§19's "saving and publishing are distinct operations").
+- [ ] **Step 2:** Confirm failure, implement `lib/api/assignments.ts` (`list`, `create`, `update`, `remove`, `publish` — add the teacher-only mutation methods to the file if S1 already created the read methods), `AssignmentFormDialog.tsx` (Title/Description/Due date fields, `CreateAssignmentSchema`, Save draft calls `create`/`update`, Publish calls `create`/`update` then `publish` as a second explicit call — never bundled into one request), `AssignmentList.tsx` (title/status badge/due date/actions per spec §33).
+- [ ] **Step 3:** Run to green.
+- [ ] **Step 4: Commit**
+```bash
+git add apps/web/lib/api/assignments.ts apps/web/app/teacher/classes/[id]/assignments/ apps/web/components/assignments/ apps/web/tests/components/assignments/
+git commit -m "feat: teacher assignment CRUD + publish UI"
+```
+
+---
+
+### Task T8: Teacher — Grading UI
+
+**Files:**
+- Create: `apps/web/lib/api/submissions.ts` (skip if **Task S1** already created it — extend with the teacher's `listForAssignment` method)
+- Create: `apps/web/lib/api/grades.ts` (skip if **Task S2** already created it — extend with the teacher's `create`/`update` methods)
+- Create: `apps/web/app/teacher/assignments/[id]/submissions/page.tsx`, `apps/web/components/grading/SubmissionList.tsx`, `apps/web/components/grading/GradeForm.tsx`
+- Create: `apps/web/tests/components/grading/GradeForm.test.tsx`
+
+**Interfaces:**
+- Depends on **Task T4** (submissions) and **Task T5** (grades).
+
+- [ ] **Step 1:** Write `GradeForm.test.tsx` (RTL: score input rejects non-numeric/out-of-range via field error before submit — mirrors `GradeSubmissionSchema`'s `min(0).max(100)`; "Save Grade" disabled while a request is pending).
+- [ ] **Step 2:** Confirm failure, implement `lib/api/submissions.ts`'s `listForAssignment` method, `lib/api/grades.ts`'s `create`/`update` methods, page listing each student's submission content with a `GradeForm` (Score input, Feedback textarea, Save Grade button) per spec §34 — teacher only ever sees submissions for assignments they own (route guarded server-side already by T4/T5; client just calls the API and surfaces the 403 as an error state if it somehow gets one).
+- [ ] **Step 3:** Run to green.
+- [ ] **Step 4: Commit**
+```bash
+git add apps/web/lib/api/submissions.ts apps/web/lib/api/grades.ts apps/web/app/teacher/assignments/ apps/web/components/grading/ apps/web/tests/components/grading/
+git commit -m "feat: teacher grading UI"
+```
+
+---
+
+### Task T9: Teacher vertical coverage sweep
+
+**Files:**
+- Modify: `apps/api/vitest.config.ts` (coverage thresholds, if not already set by A7)
+- Modify: any `apps/api/src/modules/{classes,assignments,submissions,grades}/**` or `apps/web/{lib/api/*,components/{classes,assignments,grading}/**}` file with uncovered branches
+
+**Interfaces:**
+- Consumes: nothing new — closes gaps across T1–T8.
+
+- [ ] **Step 1:** If `apps/api/vitest.config.ts` doesn't yet have coverage thresholds (check whether A7 already added them), add:
+```typescript
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: "v8",
+      thresholds: { statements: 100, branches: 100, functions: 100, lines: 100 },
+    },
+  },
+});
+```
+- [ ] **Step 2:** Run `npm run coverage --workspace=apps/api -- classes assignments submissions grades` and `npm run coverage --workspace=apps/web -- classes assignments grading`.
+- [ ] **Step 3:** For every uncovered line/branch reported, add the missing test case (ownership-forbidden branch, not-found branch, validation-error branch, conflict branch, publish-lifecycle branch — per spec §39's required branch list) to the relevant existing test file from T1–T8.
+- [ ] **Step 4:** Re-run coverage until all four metrics report 100% for every file this vertical owns.
+- [ ] **Step 5: Commit**
+```bash
+git add apps/api/vitest.config.ts apps/api/tests/modules/classes/ apps/api/tests/modules/assignments/ apps/api/tests/modules/submissions/ apps/api/tests/modules/grades/ apps/web/tests/components/classes/ apps/web/tests/components/assignments/ apps/web/tests/components/grading/
+git commit -m "test: close teacher vertical coverage gaps to 100%"
 ```
 
 ---
 
 ## Final Integration Checklist (all three, before submission)
 
-Once P1–P12, V1–V9, F1–F12 are all merged to `main`:
+Once P1–P12/S1–S4 (Prateek), A1–A7 (Vraj), and T1–T9 (Preksha) are all merged to `main`:
 
 - [ ] Run `npm run coverage` from root — confirm 100% across every workspace.
+- [ ] Confirm the two coordination points landed on both sides: stats cache invalidation wired into `grades.service.ts` (A3 ↔ T5) and `lib/api/{classes,assignments,submissions,grades}.ts` extended rather than duplicated (S1/S2 ↔ T6/T7/T8).
 - [ ] Run `docker compose up -d --build` — confirm all 5 services healthy.
 - [ ] Manually walk the full demo flow from spec §55 against the running compose stack.
 - [ ] Confirm `.github/workflows/ci.yml` is green on the actual PR that merges this work.
