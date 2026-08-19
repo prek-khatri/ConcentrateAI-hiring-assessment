@@ -17,23 +17,27 @@ export async function buildContextForUser(db: Kysely<DB>, user: AuthedUser): Pro
   if (user.role === "student") {
     const service = createStudentService(db);
     const classes = await service.listMyClasses(user.id);
-    const submissions = await service.listMySubmissions(user.id);
+    const assignments = await service.listAllAssignments(user.id);
 
     const classLines =
       classes.length > 0 ? classes.map((c) => `${c.name} (taught by ${c.teacherName})`).join("; ") : "none";
 
-    const gradedLines = submissions
-      .filter((s) => s.score !== null)
-      .map((s) => `${s.assignmentTitle} (${s.className}): ${s.score}/100`);
-    const pendingLines = submissions
-      .filter((s) => s.score === null)
-      .map((s) => `${s.assignmentTitle} (${s.className}): submitted, awaiting grade`);
+    const notSubmittedLines = assignments
+      .filter((a) => a.submissionId === null)
+      .map((a) => `${a.title} (${a.className})${a.due_at ? `, due ${a.due_at.toISOString().slice(0, 10)}` : ""}`);
+    const gradedLines = assignments
+      .filter((a) => a.score !== null)
+      .map((a) => `${a.title} (${a.className}): ${a.score}/100`);
+    const awaitingGradeLines = assignments
+      .filter((a) => a.submissionId !== null && a.score === null)
+      .map((a) => `${a.title} (${a.className}): submitted, awaiting grade`);
 
     return [
       `The current user is a student named ${user.name}.`,
       `Enrolled classes: ${classLines}`,
+      `Not yet submitted: ${notSubmittedLines.length > 0 ? notSubmittedLines.join("; ") : "none"}`,
+      `Awaiting grade: ${awaitingGradeLines.length > 0 ? awaitingGradeLines.join("; ") : "none"}`,
       `Graded work: ${gradedLines.length > 0 ? gradedLines.join("; ") : "none yet"}`,
-      `Pending (submitted, not yet graded): ${pendingLines.length > 0 ? pendingLines.join("; ") : "none"}`,
     ].join("\n");
   }
 

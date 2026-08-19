@@ -17,6 +17,21 @@ describe("buildContextForUser", () => {
     expect(context).toContain("Cell Structure");
   });
 
+  it("includes assignments the student hasn't submitted yet", async () => {
+    const student = await db
+      .selectFrom("users")
+      .selectAll()
+      .where("email", "=", "student2@example.com")
+      .executeTakeFirstOrThrow();
+    const context = await buildContextForUser(db, {
+      id: student.id,
+      email: student.email,
+      name: student.name,
+      role: "student",
+    });
+    expect(context).toMatch(/not yet submitted:.*cell structure/i);
+  });
+
   it("returns a minimal honest context for roles without wired-up data yet", async () => {
     const context = await buildContextForUser(db, {
       id: "teacher-id",

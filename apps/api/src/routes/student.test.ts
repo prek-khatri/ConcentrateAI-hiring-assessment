@@ -73,6 +73,37 @@ describe("GET /api/student/classes", () => {
   });
 });
 
+describe("GET /api/student/assignments", () => {
+  it("returns assignments across all enrolled classes with submission status", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/student/assignments",
+      cookies: { [AUTH_COOKIE_NAME]: studentCookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const items = res.json().assignments;
+    const cellStructure = items.find((a: { title: string }) => a.title === "Cell Structure");
+    expect(cellStructure.submissionId).not.toBeNull();
+    expect(cellStructure.score).not.toBeNull();
+    await app.close();
+  });
+
+  it("marks assignments with no submission yet as null", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/student/assignments",
+      cookies: { [AUTH_COOKIE_NAME]: student2Cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    const cellStructure = res.json().assignments.find((a: { title: string }) => a.title === "Cell Structure");
+    expect(cellStructure.submissionId).toBeNull();
+    expect(cellStructure.score).toBeNull();
+    await app.close();
+  });
+});
+
 describe("GET /api/student/classes/:classId/assignments", () => {
   it("returns only published assignments", async () => {
     const app = await buildApp();

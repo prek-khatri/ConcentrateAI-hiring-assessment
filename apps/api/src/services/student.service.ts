@@ -134,6 +134,31 @@ export function createStudentService(db: Kysely<DB>) {
         .executeTakeFirstOrThrow();
     },
 
+    async listAllAssignments(studentId: string) {
+      return db
+        .selectFrom("class_students")
+        .innerJoin("assignments", "assignments.class_id", "class_students.class_id")
+        .innerJoin("classes", "classes.id", "assignments.class_id")
+        .leftJoin("submissions", (join) =>
+          join.onRef("submissions.assignment_id", "=", "assignments.id").on("submissions.student_id", "=", studentId)
+        )
+        .leftJoin("grades", "grades.submission_id", "submissions.id")
+        .select([
+          "assignments.id",
+          "assignments.title",
+          "assignments.description",
+          "assignments.due_at",
+          "classes.id as classId",
+          "classes.name as className",
+          "submissions.id as submissionId",
+          "grades.score",
+        ])
+        .where("class_students.student_id", "=", studentId)
+        .where("assignments.published", "=", true)
+        .orderBy("assignments.due_at", "asc")
+        .execute();
+    },
+
     async listMySubmissions(studentId: string) {
       return db
         .selectFrom("submissions")
