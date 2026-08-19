@@ -7,12 +7,28 @@ import { env } from "./env.js";
 import { authRoutes } from "./routes/auth.js";
 import { studentRoutes } from "./routes/student.js";
 import { chatRoutes } from "./routes/chat.js";
+import { adminRoutes } from "./routes/admin.js";
+import { statsRoutes } from "./routes/stats.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
 
   await app.register(cookie);
   await app.register(cors, { origin: env.WEB_ORIGIN, credentials: true });
+
+  // Tolerate an empty JSON body: bodyless requests (e.g. a DELETE) that still
+  // carry `Content-Type: application/json` must not 500 on the default parser.
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
+    if (!body) {
+      done(null, undefined);
+      return;
+    }
+    try {
+      done(null, JSON.parse(body as string));
+    } catch (err) {
+      done(err as Error);
+    }
+  });
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof ApiError) {
@@ -41,6 +57,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes);
   await app.register(studentRoutes);
   await app.register(chatRoutes);
+  await app.register(adminRoutes);
+  await app.register(statsRoutes);
 
   return app;
 }
