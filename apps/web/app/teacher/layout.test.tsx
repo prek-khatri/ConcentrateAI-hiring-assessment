@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 const pushMock = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock }), usePathname: () => "/teacher" }));
 
 import TeacherLayout from "./layout";
 
