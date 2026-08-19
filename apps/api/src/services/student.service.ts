@@ -142,6 +142,7 @@ export function createStudentService(db: Kysely<DB>) {
         .leftJoin("grades", "grades.submission_id", "submissions.id")
         .select([
           "submissions.id",
+          "submissions.assignment_id",
           "assignments.title as assignmentTitle",
           "classes.name as className",
           "grades.score",

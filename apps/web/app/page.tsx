@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, ApiClientError } from "@/lib/api";
+import { GoogleIcon } from "@/components/GoogleIcon";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -73,7 +74,11 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <a href={`${API_URL}/auth/google`} className="text-center text-sm underline">
+      <a
+        href={`${API_URL}/auth/google`}
+        className="flex items-center justify-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+      >
+        <GoogleIcon />
         Sign in with Google
       </a>
     </main>
