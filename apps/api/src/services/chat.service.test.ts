@@ -205,6 +205,16 @@ describe("buildContextForUser", () => {
       .insertInto("grades")
       .values({ submission_id: submission.id, score: 88, graded_by: teacher2.id })
       .execute();
+    const popQuiz = await db
+      .insertInto("assignments")
+      .values({ class_id: tempClass.id, title: "Pop Quiz", published: true, due_at: null })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const popQuizSubmission = await db
+      .insertInto("submissions")
+      .values({ assignment_id: popQuiz.id, student_id: student.id, content: "answer" })
+      .returningAll()
+      .executeTakeFirstOrThrow();
 
     const context = await buildContextForUser(db, {
       id: teacher2.id,
@@ -218,7 +228,10 @@ describe("buildContextForUser", () => {
     expect(context).toMatch(/"Titration Lab".*1\/2 submitted.*average score 88\/100/i);
     expect(context).toMatch(/not yet submitted:.*sasha student/i);
     expect(context).toMatch(/"Unpublished Draft" \(draft\).*0\/2 submitted.*no grades yet/i);
+    expect(context).toMatch(/needs grading in chat context chemistry:.*"pop quiz" \(1 submission\)/i);
 
+    await db.deleteFrom("submissions").where("id", "=", popQuizSubmission.id).execute();
+    await db.deleteFrom("assignments").where("id", "=", popQuiz.id).execute();
     await db.deleteFrom("grades").where("submission_id", "=", submission.id).execute();
     await db.deleteFrom("submissions").where("id", "=", submission.id).execute();
     await db.deleteFrom("assignments").where("id", "in", [gradedAssignment.id, draftAssignment.id]).execute();
@@ -247,8 +260,9 @@ describe("buildContextForUser", () => {
     await db.deleteFrom("classes").where("id", "=", tempClass.id).execute();
   });
 
-  it("reports an assignment with a submission still awaiting grading", async () => {
+  it("reports an assignment with submissions still awaiting grading (plural)", async () => {
     const teacher2 = await db.selectFrom("users").selectAll().where("email", "=", "teacher2@example.com").executeTakeFirstOrThrow();
+    const student = await db.selectFrom("users").selectAll().where("email", "=", "student@example.com").executeTakeFirstOrThrow();
     const student3 = await db.selectFrom("users").selectAll().where("email", "=", "student3@example.com").executeTakeFirstOrThrow();
 
     const tempClass = await db
@@ -256,17 +270,26 @@ describe("buildContextForUser", () => {
       .values({ name: "Chat Context Physics", teacher_id: teacher2.id })
       .returningAll()
       .executeTakeFirstOrThrow();
-    await db.insertInto("class_students").values({ class_id: tempClass.id, student_id: student3.id }).execute();
+    await db
+      .insertInto("class_students")
+      .values([
+        { class_id: tempClass.id, student_id: student.id },
+        { class_id: tempClass.id, student_id: student3.id },
+      ])
+      .execute();
     const assignment = await db
       .insertInto("assignments")
       .values({ class_id: tempClass.id, title: "Ungraded Quiz", published: true, due_at: null })
       .returningAll()
       .executeTakeFirstOrThrow();
-    const submission = await db
+    const submissions = await db
       .insertInto("submissions")
-      .values({ assignment_id: assignment.id, student_id: student3.id, content: "answer" })
+      .values([
+        { assignment_id: assignment.id, student_id: student.id, content: "answer 1" },
+        { assignment_id: assignment.id, student_id: student3.id, content: "answer 2" },
+      ])
       .returningAll()
-      .executeTakeFirstOrThrow();
+      .execute();
 
     const context = await buildContextForUser(db, {
       id: teacher2.id,
@@ -274,9 +297,14 @@ describe("buildContextForUser", () => {
       name: teacher2.name,
       role: "teacher",
     });
-    expect(context).toMatch(/"Ungraded Quiz".*1\/1 submitted.*no grades yet.*1 awaiting grading/i);
+    expect(context).toMatch(/"Ungraded Quiz".*2\/2 submitted.*no grades yet.*2 awaiting grading/i);
+    expect(context).toMatch(/needs grading in chat context physics:.*"ungraded quiz" \(2 submissions\)/i);
 
-    await db.deleteFrom("submissions").where("id", "=", submission.id).execute();
+    await db.deleteFrom("submissions").where(
+      "id",
+      "in",
+      submissions.map((s) => s.id)
+    ).execute();
     await db.deleteFrom("assignments").where("id", "=", assignment.id).execute();
     await db.deleteFrom("class_students").where("class_id", "=", tempClass.id).execute();
     await db.deleteFrom("classes").where("id", "=", tempClass.id).execute();

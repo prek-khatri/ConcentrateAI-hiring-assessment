@@ -10,7 +10,10 @@ const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const SYSTEM_PROMPT = [
   "You are a helpful assistant embedded in a school portal.",
-  "Answer ONLY using the context about the current user provided below.",
+  "Answer ONLY using the context about the current user provided below — it is a complete",
+  "and already-computed summary; do not recompute or re-derive counts from it, just relay them.",
+  "'Not yet submitted' and 'needs grading' are different things: 'not yet submitted' means no",
+  "submission exists at all, so there is nothing to grade for it yet.",
   "If the answer isn't in the context, say you don't have that information.",
   "Never invent data and never discuss anyone else's information.",
 ].join(" ");
@@ -57,10 +60,13 @@ export async function buildContextForUser(db: Kysely<DB>, user: AuthedUser): Pro
         const rosterLine =
           roster.length > 0 ? `${roster.length} students enrolled (${roster.map((s) => s.name).join(", ")})` : "no students enrolled";
 
+        const needsGrading: string[] = [];
+
         const assignmentLines = await Promise.all(
           assignments.map(async (a) => {
             const { submissions } = await service.getAssignment(user.id, a.id);
             const graded = submissions.filter((s) => s.score !== null);
+            const pending = submissions.length - graded.length;
             const avgScore = graded.length
               ? Math.round(graded.reduce((sum, s) => sum + Number(s.score), 0) / graded.length)
               : null;
@@ -68,11 +74,13 @@ export async function buildContextForUser(db: Kysely<DB>, user: AuthedUser): Pro
               .filter((s) => !submissions.some((sub) => sub.studentId === s.id))
               .map((s) => s.name);
 
+            if (pending > 0) needsGrading.push(`"${a.title}" (${pending} submission${pending === 1 ? "" : "s"})`);
+
             return [
               `"${a.title}" (${a.published ? "published" : "draft"})`,
               `${submissions.length}/${roster.length} submitted`,
               avgScore !== null ? `average score ${avgScore}/100` : "no grades yet",
-              graded.length < submissions.length ? `${submissions.length - graded.length} awaiting grading` : null,
+              pending > 0 ? `${pending} awaiting grading` : null,
               notSubmitted.length > 0 ? `not yet submitted: ${notSubmitted.join(", ")}` : null,
             ]
               .filter(Boolean)
@@ -83,6 +91,7 @@ export async function buildContextForUser(db: Kysely<DB>, user: AuthedUser): Pro
         return [
           `${cls.name}: ${rosterLine}`,
           assignmentLines.length > 0 ? assignmentLines.map((l) => `  - ${l}`).join("\n") : "  No assignments yet",
+          `  Needs grading in ${cls.name}: ${needsGrading.length > 0 ? needsGrading.join(", ") : "nothing — everything submitted so far has been graded"}`,
         ].join("\n");
       })
     );
@@ -111,6 +120,7 @@ export async function askChatbot(context: string, message: string): Promise<stri
     body: JSON.stringify({
       model: "openai/gpt-oss-20b",
       max_tokens: 300,
+      temperature: 0.1,
       messages: [
         { role: "system", content: `${SYSTEM_PROMPT}\n\nContext:\n${context}` },
         { role: "user", content: message },
