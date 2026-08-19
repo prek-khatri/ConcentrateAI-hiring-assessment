@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { usePathname } from "next/navigation";
 import { authApi } from "@/lib/auth-api";
 import { chatApi } from "@/lib/chat-api";
 import { ApiClientError } from "@/lib/api";
@@ -8,19 +9,23 @@ import { ApiClientError } from "@/lib/api";
 type Message = { role: "user" | "assistant"; content: string };
 
 export function ChatWidget() {
-  const [authed, setAuthed] = useState(false);
+  const pathname = usePathname();
+  const [visible, setVisible] = useState(false);
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Re-checked on every navigation, not just once on mount: the root layout persists
+  // across client-side route changes, so a fresh login redirect wouldn't otherwise
+  // trigger a re-check and the widget could get stuck on the previous page's auth state.
   useEffect(() => {
     authApi
       .me()
-      .then(() => setAuthed(true))
-      .catch(() => setAuthed(false));
-  }, []);
+      .then((user) => setVisible(user.role === "teacher" || user.role === "student"))
+      .catch(() => setVisible(false));
+  }, [pathname]);
 
   async function handleSend(e: FormEvent) {
     e.preventDefault();
@@ -40,7 +45,7 @@ export function ChatWidget() {
     }
   }
 
-  if (!authed) return null;
+  if (!visible) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
