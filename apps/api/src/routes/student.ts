@@ -12,6 +12,10 @@ export async function studentRoutes(app: FastifyInstance): Promise<void> {
     return { classes: await service.listMyClasses(request.user.id) };
   });
 
+  app.get("/api/student/assignments", { preHandler: guards }, async (request) => {
+    return { assignments: await service.listAllAssignments(request.user.id) };
+  });
+
   app.get("/api/student/classes/:classId/assignments", { preHandler: guards }, async (request) => {
     const { classId } = request.params as { classId: string };
     return { assignments: await service.listAssignmentsForClass(request.user.id, classId) };

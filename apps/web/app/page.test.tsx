@@ -55,4 +55,24 @@ describe("LoginPage", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/invalid email or password/i));
     expect(pushMock).not.toHaveBeenCalled();
   });
+
+  it("shows a generic error when the failure isn't an ApiClientError", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<LoginPage />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: "student@example.com" } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: "password123" } });
+    fireEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/something went wrong/i));
+  });
+
+  it("uses NEXT_PUBLIC_API_URL for the Google sign-in link when it's set", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.example.com");
+    vi.resetModules();
+    const { default: LoginPageWithEnv } = await import("./page");
+    render(<LoginPageWithEnv />);
+    expect(screen.getByRole("link", { name: /sign in with google/i })).toHaveAttribute(
+      "href",
+      "https://api.example.com/auth/google"
+    );
+  });
 });

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import "./globals.css";
+import { ChatWidget } from "@/components/ChatWidget";
 
 export const metadata = {
   title: "Concentrate School Portal",
@@ -8,7 +9,10 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <ChatWidget />
+      </body>
     </html>
   );
 }

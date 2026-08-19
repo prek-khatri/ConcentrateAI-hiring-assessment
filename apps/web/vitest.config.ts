@@ -15,6 +15,17 @@ export default defineConfig({
         functions: 100,
         lines: 100,
       },
+      exclude: [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        ".next/**",
+        "next-env.d.ts",
+        "vitest.config.ts",
+        "vitest.setup.ts",
+        "next.config.ts", // framework config, no runtime logic
+        "tailwind.config.ts", // framework config, no runtime logic
+        "postcss.config.mjs", // framework config, no runtime logic
+      ],
     },
   },
   resolve: {

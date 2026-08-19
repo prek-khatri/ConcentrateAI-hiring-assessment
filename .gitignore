@@ -23,3 +23,6 @@ npm-debug.log*
 .remember/
 .agents/
 .claude/
+
+# Next.js generated types
+apps/web/next-env.d.ts
