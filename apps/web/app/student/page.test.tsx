@@ -29,6 +29,12 @@ describe("StudentClassesPage", () => {
     ));
   });
 
+  it("shows a generic error when the failure isn't an ApiClientError", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<StudentClassesPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/failed to load classes/i));
+  });
+
   it("shows an error state with a retry button on failure", async () => {
     vi.stubGlobal(
       "fetch",
