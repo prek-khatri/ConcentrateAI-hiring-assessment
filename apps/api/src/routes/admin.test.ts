@@ -246,6 +246,32 @@ describe("teacher groups", () => {
   });
 });
 
+describe("cross-cutting error paths (reached via admin routes)", () => {
+  it("500s on an unexpected DB error (malformed id hits the generic handler)", async () => {
+    // A non-uuid id makes Postgres throw 22P02 — a non-ApiError, exercising app.ts's fallback.
+    const res = await asAdmin("DELETE", "/api/admin/users/not-a-uuid");
+    expect(res.statusCode).toBe(500);
+    expect(res.json().error.code).toBe("INTERNAL_ERROR");
+  });
+
+  it("403s when a session belongs to a user suspended after login (requireAuth guard)", async () => {
+    const id = await createTempUser("admin");
+    const email = (await db.selectFrom("users").select("email").where("id", "=", id).executeTakeFirstOrThrow())
+      .email;
+    const cookie = await loginAs(email);
+    await asAdmin("POST", `/api/admin/users/${id}/suspend`);
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/admin/users",
+      cookies: { [AUTH_COOKIE_NAME]: cookie },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+});
+
 describe("admin.service (direct)", () => {
   it("rethrows non-unique DB errors on create", async () => {
     const service = createAdminService(db);
