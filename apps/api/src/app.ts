@@ -9,6 +9,7 @@ import { studentRoutes } from "./routes/student.js";
 import { chatRoutes } from "./routes/chat.js";
 import { adminRoutes } from "./routes/admin.js";
 import { statsRoutes } from "./routes/stats.js";
+import { teacherRoutes } from "./routes/teacher.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -59,6 +60,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(chatRoutes);
   await app.register(adminRoutes);
   await app.register(statsRoutes);
+  await app.register(teacherRoutes);
 
   return app;
 }
