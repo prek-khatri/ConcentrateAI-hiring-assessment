@@ -143,6 +143,48 @@ describe("GET /api/student/assignments/:assignmentId", () => {
     expect(res.json().submission.score).not.toBeNull();
     await app.close();
   });
+
+  it("returns submission: null when the student hasn't submitted yet", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/student/assignments/${publishedAssignmentId}`,
+      cookies: { [AUTH_COOKIE_NAME]: student2Cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().submission).toBeNull();
+    await app.close();
+  });
+
+  it("404s on a published assignment in a class the student isn't enrolled in", async () => {
+    const teacher2 = await db
+      .selectFrom("users")
+      .selectAll()
+      .where("email", "=", "teacher2@example.com")
+      .executeTakeFirstOrThrow();
+    const otherClass = await db
+      .insertInto("classes")
+      .values({ name: "Astronomy 401", teacher_id: teacher2.id })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const otherAssignment = await db
+      .insertInto("assignments")
+      .values({ class_id: otherClass.id, title: "Orbits", published: true })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/student/assignments/${otherAssignment.id}`,
+      cookies: { [AUTH_COOKIE_NAME]: studentCookie },
+    });
+    expect(res.statusCode).toBe(404);
+
+    await db.deleteFrom("assignments").where("id", "=", otherAssignment.id).execute();
+    await db.deleteFrom("classes").where("id", "=", otherClass.id).execute();
+    await app.close();
+  });
 });
 
 describe("POST /api/student/assignments/:assignmentId/submission", () => {
