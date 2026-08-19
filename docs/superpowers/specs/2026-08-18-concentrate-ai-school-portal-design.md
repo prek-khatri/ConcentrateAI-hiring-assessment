@@ -56,7 +56,7 @@ added without updating this doc first.
 ```
 apps/api (runtime):
   fastify, @fastify/cookie, @fastify/cors, kysely, pg, ioredis,
-  zod, jsonwebtoken, arctic, pino
+  zod, jsonwebtoken, arctic, pino, groq-sdk
 
 apps/web (runtime):
   next, react, react-dom, tailwindcss, zod
@@ -120,6 +120,14 @@ npm ci
   → [separate job] Playwright E2E against composed stack
   → [main branch only] Docker Hub login → build → push
 ```
+
+## Chatbot (extra credit)
+
+- Provider: **Groq** (`groq-sdk`), not Anthropic/OpenAI — fast inference, generous free tier, simple chat-completions API.
+- One endpoint, `POST /api/chatbot/ask` (`requireAuth`, no role restriction — every role gets it, scoped by their own data). Body: `{message: string}`. Response: `{reply: string}`.
+- Context assembled server-side per request from `request.user` — never client-supplied: role, and role-appropriate data pulled through the existing repositories (student: their enrolled classes, upcoming published assignments, recent grades; teacher: their classes, assignments, pending ungraded submissions; admin: user/teacher-group counts). This context is injected into the system prompt; the model never gets raw DB access or a tool that can query outside what's been assembled.
+- The system prompt explicitly instructs the model to answer only from the supplied context and to decline anything outside it — this is a narrow Q&A feature per spec §51, not a general-purpose assistant.
+- `GROQ_API_KEY` added to the env schema (P2) and `.env.example`.
 
 ## Everything else
 

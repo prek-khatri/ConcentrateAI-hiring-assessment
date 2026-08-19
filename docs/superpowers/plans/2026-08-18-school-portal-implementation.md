@@ -23,7 +23,7 @@
 
 ## Team Assignment & Sequencing
 
-- **Prateek — Foundation + Student Vertical (Tasks P1–P12, S1–S4):** everything shared (repo scaffold, DB schema/migrations/seed, shared Zod/DTO contracts, Fastify+Next bootstrap, Redis, Google OAuth+JWT+RBAC, Docker/Nginx/Certbot, CI/CD), plus the Student-facing app shell/nav and all Student UI.
+- **Prateek — Foundation + Student Vertical (Tasks P1–P12, S1–S5):** everything shared (repo scaffold, DB schema/migrations/seed, shared Zod/DTO contracts, Fastify+Next bootstrap, Redis, Google OAuth+JWT+RBAC, Docker/Nginx/Certbot, CI/CD), plus the Student-facing app shell/nav, all Student UI, and the Groq-backed chatbot extra credit (S5, spec §51).
 - **Vraj — Admin Vertical (Tasks A1–A7):** Users management, Teacher Groups, Statistics API+caching — backend and UI, end to end.
 - **Preksha — Teacher Vertical (Tasks T1–T9):** Classes, Enrollment, Assignments, Submissions, Grades — backend and UI, end to end. This is the heaviest vertical since Teacher is the primary actor for most of the domain model (creates classes, manages assignments, grades submissions).
 
@@ -1032,6 +1032,147 @@ git commit -m "test: close student vertical coverage gaps to 100%"
 ```bash
 git add e2e/
 git commit -m "test: playwright e2e golden path and negative authorization paths"
+```
+
+---
+
+### Task S5: Chatbot (extra credit)
+
+**Files:**
+- Create: `apps/api/src/modules/chatbot/{chatbot.context.ts,chatbot.service.ts,chatbot.routes.ts}`
+- Modify: `apps/api/src/config/env.ts` (add `GROQ_API_KEY`), `.env.example`, `apps/api/src/app.ts` (register chatbot routes)
+- Create: `apps/web/lib/api/chatbot.ts`
+- Create: `apps/web/components/chatbot/ChatWidget.tsx`
+- Modify: `apps/web/components/shell/AppShell.tsx` (mount the widget for every role)
+- Create: `apps/api/tests/modules/chatbot/*.test.ts`
+- Create: `apps/web/tests/components/chatbot/ChatWidget.test.tsx`
+
+**Interfaces:**
+- Consumes: `requireAuth` (P9); repositories from **Task A1** (users), **Task T1** (classes), **Task T3** (assignments), **Task T4** (submissions), **Task T5** (grades) to assemble context — this task should land after those five, since it reads from all of them. Do not add new query logic duplicating what those repositories already expose; import and call them.
+- Produces: `POST /api/chatbot/ask` — body `{message: string}` (validated via a new `AskChatbotSchema` in `packages/shared/src/schemas/chatbot.ts`, `{message: z.string().min(1).max(1000)}`), response `{reply: string}`.
+
+- [ ] **Step 1: Write the failing test**
+```typescript
+// apps/api/tests/modules/chatbot/chatbot.routes.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { buildApp } from "../../../src/app.js";
+import { db } from "../../../src/db.js";
+import { signJwt } from "@school/auth/jwt";
+import { env } from "../../../src/config/env.js";
+import { AUTH_COOKIE_NAME } from "@school/auth/cookies";
+
+describe("POST /api/chatbot/ask", () => {
+  it("401s with no cookie", async () => {
+    const app = await buildApp();
+    const res = await app.inject({ method: "POST", url: "/api/chatbot/ask", payload: { message: "hi" } });
+    expect(res.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("400s on empty message", async () => {
+    const app = await buildApp();
+    const student = await db.selectFrom("users").selectAll().where("role", "=", "student").executeTakeFirstOrThrow();
+    const cookie = signJwt({ sub: student.id, role: student.role }, env.JWT_SECRET);
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/chatbot/ask",
+      cookies: { [AUTH_COOKIE_NAME]: cookie },
+      payload: { message: "" },
+    });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+});
+```
+- [ ] **Step 2:** Run `npm run test --workspace=apps/api -- chatbot.routes.test.ts`. Expected: FAIL.
+- [ ] **Step 3:** Add `GROQ_API_KEY: z.string().min(1)` to `apps/api/src/config/env.ts`'s `envSchema`, and to `.env.example` with a one-line comment.
+- [ ] **Step 4:** Add `packages/shared/src/schemas/chatbot.ts`: `export const AskChatbotSchema = z.object({ message: z.string().min(1).max(1000) });`, re-export it from `packages/shared/src/index.ts`.
+- [ ] **Step 5:** Write `apps/api/src/modules/chatbot/chatbot.context.ts` — one function per role, each returning a small plain-text context block built from existing repositories, nothing new queried ad hoc:
+```typescript
+import { createClassesRepository } from "../classes/classes.repository.js";
+import { createAssignmentsRepository } from "../assignments/assignments.repository.js";
+import { createSubmissionsRepository } from "../submissions/submissions.repository.js";
+import { createGradesRepository } from "../grades/grades.repository.js";
+import { createUsersRepository } from "../users/users.repository.js";
+import type { Kysely } from "kysely";
+import type { DB } from "@school/db/types";
+
+export async function buildContextForUser(
+  db: Kysely<DB>,
+  user: { id: string; role: "admin" | "teacher" | "student" }
+): Promise<string> {
+  if (user.role === "student") {
+    const classes = await createClassesRepository(db).findByStudent(user.id);
+    const assignments = await createAssignmentsRepository(db).listPublishedForStudent(user.id);
+    const grades = await createGradesRepository(db).listForStudent(user.id);
+    return [
+      `Enrolled classes: ${classes.map((c) => c.name).join(", ") || "none"}`,
+      `Upcoming published assignments: ${assignments.map((a) => `${a.title} (due ${a.due_at ?? "no due date"})`).join("; ") || "none"}`,
+      `Recent grades: ${grades.map((g) => `${g.score}/100`).join(", ") || "none"}`,
+    ].join("\n");
+  }
+  if (user.role === "teacher") {
+    const classes = await createClassesRepository(db).findByTeacher(user.id);
+    return [`Classes taught: ${classes.map((c) => c.name).join(", ") || "none"}`].join("\n");
+    // Extend with pending-ungraded-submission counts per class using createSubmissionsRepository
+    // once its list-by-teacher method is available.
+  }
+  const userCount = (await createUsersRepository(db).findAll()).length;
+  return `Total users in the system: ${userCount}`;
+}
+```
+*(If `classesRepository.findByStudent`/`findByTeacher`, `assignmentsRepository.listPublishedForStudent`, or `gradesRepository.listForStudent` don't exist yet under those exact names when you reach this step, add the missing thin repository method to the relevant existing file — following that file's existing query patterns — rather than duplicating the query here.)*
+- [ ] **Step 6:** Write `apps/api/src/modules/chatbot/chatbot.service.ts`:
+```typescript
+import Groq from "groq-sdk";
+import { env } from "../../config/env.js";
+
+const groq = new Groq({ apiKey: env.GROQ_API_KEY });
+
+const SYSTEM_PROMPT = `You are a helpful assistant for a school portal. Answer ONLY using the context provided below about the current user. If the answer isn't in the context, say you don't have that information. Never invent data, never discuss other users, never reveal information outside the given context.`;
+
+export async function askChatbot(context: string, message: string): Promise<string> {
+  const completion = await groq.chat.completions.create({
+    model: "llama-3.1-8b-instant",
+    messages: [
+      { role: "system", content: `${SYSTEM_PROMPT}\n\nContext:\n${context}` },
+      { role: "user", content: message },
+    ],
+    max_tokens: 300,
+  });
+  return completion.choices[0]?.message?.content ?? "Sorry, I couldn't generate a response.";
+}
+```
+- [ ] **Step 7:** Write `apps/api/src/modules/chatbot/chatbot.routes.ts` — one route, `POST /api/chatbot/ask`, `preHandler: [requireAuth]`, body parsed with `AskChatbotSchema`, calls `buildContextForUser(db, request.user)` then `askChatbot(context, message)`, returns `{reply}`.
+- [ ] **Step 8:** Register in `apps/api/src/app.ts`.
+- [ ] **Step 9:** Run tests again. Expected: PASS. Add a mocked-Groq test case (`vi.mock("groq-sdk", ...)`) asserting a 200 with a `reply` string for an authenticated student, and asserting the request payload sent to Groq includes the assembled context — this keeps the test suite free of real network calls.
+- [ ] **Step 10:** Write `apps/web/lib/api/chatbot.ts` (`ask(message: string): Promise<{reply: string}>` wrapping `apiFetch`).
+- [ ] **Step 11: Write the failing test**
+```tsx
+// apps/web/tests/components/chatbot/ChatWidget.test.tsx
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { ChatWidget } from "../../../components/chatbot/ChatWidget";
+import * as chatbotApi from "../../../lib/api/chatbot";
+
+describe("ChatWidget", () => {
+  it("sends a message and renders the reply", async () => {
+    vi.spyOn(chatbotApi, "ask").mockResolvedValue({ reply: "You have 2 assignments due soon." });
+    render(<ChatWidget />);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "What's due soon?" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+    await waitFor(() => expect(screen.getByText(/2 assignments due soon/i)).toBeInTheDocument());
+  });
+});
+```
+- [ ] **Step 12:** Confirm failure, implement `ChatWidget.tsx` — a collapsible panel (button toggles open/closed), message list, textarea + Send button (disabled while a request is pending), calls `chatbotApi.ask`.
+- [ ] **Step 13:** Mount `<ChatWidget />` in `apps/web/components/shell/AppShell.tsx` so it's available to every role.
+- [ ] **Step 14:** Run test to green.
+- [ ] **Step 15:** Manual check via `npm run dev`: log in as the seeded student (dev-login), ask "What assignments are due soon?", confirm a real Groq response referencing the seeded "Photosynthesis"/"Cell Structure" assignments comes back.
+- [ ] **Step 16: Commit**
+```bash
+git add apps/api/src/modules/chatbot/ apps/api/src/config/env.ts apps/api/src/app.ts .env.example apps/api/tests/modules/chatbot/ packages/shared/src/schemas/chatbot.ts packages/shared/src/index.ts apps/web/lib/api/chatbot.ts apps/web/components/chatbot/ apps/web/components/shell/AppShell.tsx apps/web/tests/components/chatbot/
+git commit -m "feat: chatbot extra credit — groq-backed, scoped to caller's own data"
 ```
 
 ---
