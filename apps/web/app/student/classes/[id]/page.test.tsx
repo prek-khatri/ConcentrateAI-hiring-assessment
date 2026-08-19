@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "class-1" }) }));
@@ -18,6 +18,35 @@ describe("ClassAssignmentsPage", () => {
     mockFetchSequence([{ assignments: [] }, { submissions: [] }]);
     render(<ClassAssignmentsPage />);
     await waitFor(() => expect(screen.getByText(/no assignments yet/i)).toBeInTheDocument());
+  });
+
+  it("shows a generic error when the failure isn't an ApiClientError", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<ClassAssignmentsPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/failed to load assignments/i));
+  });
+
+  it("shows a load error and retries", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: { code: "INTERNAL_ERROR", message: "boom" } }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ submissions: [] }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ assignments: [] }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ submissions: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ClassAssignmentsPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/boom/i));
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    await waitFor(() => expect(screen.getByText(/no assignments yet/i)).toBeInTheDocument());
+  });
+
+  it("shows the due date when an assignment has one", async () => {
+    mockFetchSequence([
+      { assignments: [{ id: "a1", class_id: "class-1", title: "Cell Structure", description: "", published: true, due_at: "2026-09-01T12:00:00.000Z" }] },
+      { submissions: [] },
+    ]);
+    render(<ClassAssignmentsPage />);
+    await waitFor(() => expect(screen.getByText(/due 9\/1\/2026/i)).toBeInTheDocument());
   });
 
   it("derives Not submitted / Submitted / Graded status per assignment", async () => {

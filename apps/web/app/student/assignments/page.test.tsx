@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import AssignmentsPage from "./page";
 
@@ -9,6 +9,41 @@ describe("AssignmentsPage", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ assignments: [] }) }));
     render(<AssignmentsPage />);
     await waitFor(() => expect(screen.getByText(/no assignments yet/i)).toBeInTheDocument());
+  });
+
+  it("shows a generic error when the failure isn't an ApiClientError", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<AssignmentsPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/failed to load assignments/i));
+  });
+
+  it("shows a load error and retries", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: { code: "INTERNAL_ERROR", message: "boom" } }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ assignments: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<AssignmentsPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/boom/i));
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    await waitFor(() => expect(screen.getByText(/no assignments yet/i)).toBeInTheDocument());
+  });
+
+  it("shows the due date when an assignment has one", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          assignments: [
+            { id: "a1", title: "Cell Structure", description: "", due_at: "2026-09-01T12:00:00.000Z", classId: "c1", className: "Biology 101", submissionId: null, score: null },
+          ],
+        }),
+      })
+    );
+    render(<AssignmentsPage />);
+    await waitFor(() => expect(screen.getByText(/9\/1\/2026/)).toBeInTheDocument());
   });
 
   it("shows status per assignment across all classes", async () => {

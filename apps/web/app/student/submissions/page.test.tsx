@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import SubmissionsPage from "./page";
 
@@ -8,6 +8,24 @@ describe("SubmissionsPage", () => {
   it("shows an empty state with no submissions", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ submissions: [] }) }));
     render(<SubmissionsPage />);
+    await waitFor(() => expect(screen.getByText(/no submissions yet/i)).toBeInTheDocument());
+  });
+
+  it("shows a generic error when the failure isn't an ApiClientError", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    render(<SubmissionsPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/failed to load submissions/i));
+  });
+
+  it("shows a load error and retries", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: { code: "INTERNAL_ERROR", message: "boom" } }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ submissions: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<SubmissionsPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/boom/i));
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
     await waitFor(() => expect(screen.getByText(/no submissions yet/i)).toBeInTheDocument());
   });
 
