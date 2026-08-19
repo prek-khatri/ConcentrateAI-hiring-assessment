@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyError } from "fastify";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { ZodError } from "zod";
@@ -22,6 +22,15 @@ export async function buildApp(): Promise<FastifyInstance> {
       return reply.status(400).send({
         error: { code: "VALIDATION_ERROR", message: err.issues.map((i) => i.message).join("; ") },
       });
+    }
+    // Fastify's own request-parsing errors (bad JSON, wrong content-type, etc.) carry a
+    // client-facing statusCode < 500 — surface those as VALIDATION_ERROR instead of masking
+    // a client bug as a server crash.
+    const fastifyErr = err as FastifyError;
+    if (typeof fastifyErr.statusCode === "number" && fastifyErr.statusCode < 500) {
+      return reply
+        .status(fastifyErr.statusCode)
+        .send({ error: { code: "VALIDATION_ERROR", message: fastifyErr.message } });
     }
     app.log.error(err);
     return reply.status(500).send({ error: { code: "INTERNAL_ERROR", message: "Unexpected error" } });
