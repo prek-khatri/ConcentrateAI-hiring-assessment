@@ -26,6 +26,21 @@ describe("ChatWidget", () => {
     expect(screen.getByPlaceholderText(/ask a question/i)).toBeInTheDocument();
   });
 
+  it("closes the panel", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "1", name: "Sam", email: "student@example.com", role: "student" }),
+      })
+    );
+    render(<ChatWidget />);
+    fireEvent.click(await screen.findByRole("button", { name: /chat/i }));
+    fireEvent.click(screen.getByRole("button", { name: /close chat/i }));
+    expect(screen.queryByPlaceholderText(/ask a question/i)).not.toBeInTheDocument();
+  });
+
   it("sends a message and renders the reply", async () => {
     const fetchMock = vi
       .fn()
@@ -43,6 +58,44 @@ describe("ChatWidget", () => {
     fireEvent.click(screen.getByRole("button", { name: /send/i }));
 
     await waitFor(() => expect(screen.getByText(/2 assignments due soon/i)).toBeInTheDocument());
+  });
+
+  it("shows a generic error when sending fails without an ApiClientError", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "1", name: "Sam", email: "student@example.com", role: "student" }),
+      })
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ChatWidget />);
+    fireEvent.click(await screen.findByRole("button", { name: /chat/i }));
+    fireEvent.change(screen.getByPlaceholderText(/ask a question/i), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/something went wrong/i));
+  });
+
+  it("shows an error when sending a message fails", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "1", name: "Sam", email: "student@example.com", role: "student" }),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: { code: "INTERNAL_ERROR", message: "boom" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ChatWidget />);
+    fireEvent.click(await screen.findByRole("button", { name: /chat/i }));
+    fireEvent.change(screen.getByPlaceholderText(/ask a question/i), { target: { value: "hi" } });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/boom/i));
   });
 
   it("does not send an empty message", async () => {
