@@ -3,6 +3,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { ZodError } from "zod";
 import { ApiError } from "./errors.js";
+import { env } from "./env.js";
 import { authRoutes } from "./routes/auth.js";
 import { studentRoutes } from "./routes/student.js";
 
@@ -10,7 +11,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
 
   await app.register(cookie);
-  await app.register(cors, { origin: true, credentials: true });
+  await app.register(cors, { origin: env.WEB_ORIGIN, credentials: true });
 
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof ApiError) {

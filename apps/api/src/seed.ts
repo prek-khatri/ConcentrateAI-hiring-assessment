@@ -117,7 +117,7 @@ async function seed(): Promise<void> {
     .values({
       id: GRADE_ID,
       submission_id: SUBMISSION_ID,
-      score: "92",
+      score: 92,
       feedback: "Excellent explanation of mitochondria.",
       graded_by: TEACHER_ID,
     })

@@ -44,7 +44,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.get("/auth/oauth/google", async (_request, reply) => {
-    const { url, state, codeVerifier } = createGoogleAuthRequest();
+    const { url, state, codeVerifier } = await createGoogleAuthRequest();
     const isProd = env.NODE_ENV === "production";
     reply.setCookie(OAUTH_STATE_COOKIE, state, { httpOnly: true, secure: isProd, sameSite: "lax", path: "/" });
     reply.setCookie(OAUTH_VERIFIER_COOKIE, codeVerifier, {
@@ -66,6 +66,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const profile = await exchangeGoogleCode(query.code, codeVerifier);
+    if (!profile.emailVerified) {
+      throw new ApiError("UNAUTHORIZED", "Google account email is not verified");
+    }
 
     let user = await db
       .selectFrom("oauth_accounts")
