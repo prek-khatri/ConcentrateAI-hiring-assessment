@@ -177,6 +177,16 @@ describe("DELETE /api/admin/users/:id", () => {
     expect(res.statusCode).toBe(409);
   });
 
+  it("deletes a student and cascades their submissions", async () => {
+    const id = await createTempUser("student");
+    await db
+      .insertInto("submissions")
+      .values({ assignment_id: "00000000-0000-0000-0000-000000000020", student_id: id, content: "temp answer" })
+      .execute();
+    const res = await asAdmin("DELETE", `/api/admin/users/${id}`);
+    expect(res.statusCode).toBe(204);
+  });
+
   it("404s deleting an unknown user", async () => {
     const res = await asAdmin("DELETE", `/api/admin/users/${MISSING_ID}`);
     expect(res.statusCode).toBe(404);
