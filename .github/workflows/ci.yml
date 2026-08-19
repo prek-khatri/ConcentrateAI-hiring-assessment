@@ -35,6 +35,7 @@ jobs:
       DATABASE_URL: postgresql://school:school@localhost:5432/school_portal
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-only-secret-please-do-not-reuse-0123456789
+      GROQ_API_KEY: test-groq-key-not-real # chat tests mock the HTTP call; key only gates the "configured" check
 
     steps:
       - uses: actions/checkout@v4
@@ -86,6 +87,7 @@ jobs:
       DATABASE_URL: postgresql://school:school@localhost:5432/school_portal
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-only-secret-please-do-not-reuse-0123456789
+      GROQ_API_KEY: test-groq-key-not-real # chat tests mock the HTTP call; key only gates the "configured" check
 
     steps:
       - uses: actions/checkout@v4

@@ -17,20 +17,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(cookie);
   await app.register(cors, { origin: env.WEB_ORIGIN, credentials: true });
 
-  // Tolerate an empty JSON body: bodyless requests (e.g. a DELETE) that still
-  // carry `Content-Type: application/json` must not 500 on the default parser.
-  app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
-    if (!body) {
-      done(null, undefined);
-      return;
-    }
-    try {
-      done(null, JSON.parse(body as string));
-    } catch (err) {
-      done(err as Error);
-    }
-  });
-
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof ApiError) {
       return reply.status(err.statusCode).send(err.toJSON());

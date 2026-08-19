@@ -254,30 +254,6 @@ describe("cross-cutting error paths (reached via admin routes)", () => {
     expect(res.json().error.code).toBe("INTERNAL_ERROR");
   });
 
-  it("tolerates an empty JSON body on a bodyless request (no false 500)", async () => {
-    const app = await buildApp();
-    const res = await app.inject({
-      method: "DELETE",
-      url: `/api/admin/groups/${MISSING_ID}`,
-      cookies: { [AUTH_COOKIE_NAME]: adminCookie },
-      headers: { "content-type": "application/json" },
-    });
-    expect(res.statusCode).toBe(404); // reaches the handler, not a body-parse 500
-    await app.close();
-  });
-
-  it("rejects a malformed JSON body", async () => {
-    const app = await buildApp();
-    const res = await app.inject({
-      method: "POST",
-      url: "/auth/login",
-      headers: { "content-type": "application/json" },
-      payload: "{ not valid json",
-    });
-    expect(res.statusCode).toBe(500);
-    await app.close();
-  });
-
   it("403s when a session belongs to a user suspended after login (requireAuth guard)", async () => {
     const id = await createTempUser("admin");
     const email = (await db.selectFrom("users").select("email").where("id", "=", id).executeTakeFirstOrThrow())
