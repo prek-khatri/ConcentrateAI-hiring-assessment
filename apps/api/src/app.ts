@@ -4,6 +4,7 @@ import cors from "@fastify/cors";
 import { ZodError } from "zod";
 import { ApiError } from "./errors.js";
 import { authRoutes } from "./routes/auth.js";
+import { studentRoutes } from "./routes/student.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -27,6 +28,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.get("/health", async () => ({ status: "ok" }));
 
   await app.register(authRoutes);
+  await app.register(studentRoutes);
 
   return app;
 }
