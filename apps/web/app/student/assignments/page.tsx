@@ -10,6 +10,11 @@ function statusFor(a: AssignmentWithStatus): string {
   return a.score !== null ? `Graded — ${a.score}/100` : "Submitted";
 }
 
+function statusPillClass(a: AssignmentWithStatus): string {
+  if (a.submissionId === null) return "bg-warn-soft text-warn-text";
+  return a.score !== null ? "bg-success-soft text-success-text" : "bg-accent-soft text-accent-text";
+}
+
 export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState<AssignmentWithStatus[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +84,11 @@ export default function AssignmentsPage() {
                 <td className="px-4 py-3 font-mono text-xs text-muted">
                   {a.due_at ? new Date(a.due_at).toLocaleDateString() : "—"}
                 </td>
-                <td className="px-4 py-3">{statusFor(a)}</td>
+                <td className="px-4 py-3">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusPillClass(a)}`}>
+                    {statusFor(a)}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>

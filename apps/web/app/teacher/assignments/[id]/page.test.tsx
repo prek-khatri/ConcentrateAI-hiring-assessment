@@ -115,7 +115,8 @@ describe("AssignmentDetailPage", () => {
       },
     ]);
     render(<AssignmentDetailPage />);
-    await waitFor(() => expect(screen.getByText("Sam Student")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByPlaceholderText("Score")).toBeInTheDocument());
+    expect(screen.getAllByText("Sam Student").length).toBeGreaterThan(0);
     expect(screen.getByText(/mitochondria is the powerhouse/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save grade/i })).toBeInTheDocument();
 
@@ -124,6 +125,57 @@ describe("AssignmentDetailPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /save grade/i }));
 
     await waitFor(() => expect(screen.getByRole("button", { name: /update grade/i })).toBeInTheDocument());
+  });
+
+  it("switches the detail pane by clicking a different submission in the list", async () => {
+    const submissions = [
+      {
+        id: "sub-1",
+        content: "Sam's answer",
+        submitted_at: "2026-08-01T00:00:00.000Z",
+        studentId: "s1",
+        studentName: "Sam Student",
+        score: 92,
+        feedback: "Nice",
+      },
+      {
+        id: "sub-2",
+        content: "Sasha's answer",
+        submitted_at: "2026-08-02T00:00:00.000Z",
+        studentId: "s2",
+        studentName: "Sasha Student",
+        score: null,
+        feedback: null,
+      },
+    ];
+    mockRoutedFetch([
+      {
+        match: (u) => u.includes("/assignments/assignment-1"),
+        response: () => jsonResponse(200, { assignment: baseAssignment, submissions }),
+      },
+    ]);
+    render(<AssignmentDetailPage />);
+
+    // Sam (first submission) is selected by default.
+    await waitFor(() => expect(screen.getByText(/sam's answer/i)).toBeInTheDocument());
+    expect(screen.queryByText(/sasha's answer/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /previous submission/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /next submission/i })).not.toBeDisabled();
+
+    // Selecting Sasha from the list swaps the detail pane.
+    fireEvent.click(screen.getByRole("button", { name: /sasha student/i }));
+    await waitFor(() => expect(screen.getByText(/sasha's answer/i)).toBeInTheDocument());
+    expect(screen.queryByText(/sam's answer/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /previous submission/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /next submission/i })).toBeDisabled();
+
+    // Prev arrow goes back to Sam.
+    fireEvent.click(screen.getByRole("button", { name: /previous submission/i }));
+    await waitFor(() => expect(screen.getByText(/sam's answer/i)).toBeInTheDocument());
+
+    // Next arrow goes forward to Sasha again.
+    fireEvent.click(screen.getByRole("button", { name: /next submission/i }));
+    await waitFor(() => expect(screen.getByText(/sasha's answer/i)).toBeInTheDocument());
   });
 
   it("shows an error when grading fails", async () => {
@@ -147,7 +199,8 @@ describe("AssignmentDetailPage", () => {
       },
     ]);
     render(<AssignmentDetailPage />);
-    await waitFor(() => expect(screen.getByText("Sam Student")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByPlaceholderText("Score")).toBeInTheDocument());
+    expect(screen.getAllByText("Sam Student").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByPlaceholderText("Score"), { target: { value: "50" } });
     fireEvent.click(screen.getByRole("button", { name: /save grade/i }));
@@ -171,7 +224,8 @@ describe("AssignmentDetailPage", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<AssignmentDetailPage />);
-    await waitFor(() => expect(screen.getByText("Sam Student")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByPlaceholderText("Score")).toBeInTheDocument());
+    expect(screen.getAllByText("Sam Student").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByPlaceholderText("Score"), { target: { value: "50" } });
     fireEvent.click(screen.getByRole("button", { name: /save grade/i }));
