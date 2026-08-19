@@ -43,4 +43,26 @@ describe("TopBar", () => {
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
   });
+
+  it("still redirects to login even if the logout request fails", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "1", name: "Sam Student", email: "student@example.com", role: "student" }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: { code: "UNAUTHORIZED", message: "Invalid or expired session" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<TopBar />);
+    await waitFor(() => screen.getByText("Sam Student"));
+    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
+  });
 });

@@ -13,7 +13,11 @@ export function TopBar() {
   }, []);
 
   async function handleLogout() {
-    await authApi.logout();
+    try {
+      await authApi.logout();
+    } catch {
+      // Session may already be invalid server-side — still send the user back to login.
+    }
     router.push("/");
   }
 
