@@ -35,9 +35,12 @@ export default function ClassAssignmentsPage() {
 
   if (error) {
     return (
-      <main className="p-6">
-        <p role="alert">
-          {error} <button onClick={load}>Retry</button>
+      <main className="p-8">
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+          {error}{" "}
+          <button onClick={load} className="font-semibold underline">
+            Retry
+          </button>
         </p>
       </main>
     );
@@ -45,36 +48,52 @@ export default function ClassAssignmentsPage() {
 
   if (assignments === null) {
     return (
-      <main className="p-6">
-        <p>Loading assignments...</p>
+      <main className="p-8">
+        <p className="text-sm text-muted">Loading assignments...</p>
       </main>
     );
   }
 
   if (assignments.length === 0) {
     return (
-      <main className="p-6">
-        <p>No assignments yet.</p>
+      <main className="p-8">
+        <p className="text-sm text-muted">No assignments yet.</p>
       </main>
     );
   }
 
+  const statusClass: Record<Status, string> = {
+    "Not submitted": "bg-warn-soft text-warn-text",
+    Submitted: "bg-accent-soft text-accent-text",
+    Graded: "bg-success-soft text-success-text",
+  };
+
   return (
-    <main className="p-6">
+    <main className="p-8">
       <h1 className="mb-4 text-xl font-semibold">Assignments</h1>
-      <ul className="flex flex-col gap-3">
-        {assignments.map((a) => (
-          <li key={a.id} className="flex items-center justify-between rounded border p-4">
-            <div>
-              <Link href={`/student/assignments/${a.id}`} className="font-medium underline">
-                {a.title}
-              </Link>
-              {a.due_at ? <p className="text-sm text-gray-500">Due {new Date(a.due_at).toLocaleDateString()}</p> : null}
+      <div className="overflow-hidden rounded-lg border border-line bg-white">
+        {assignments.map((a, i) => {
+          const status = statusFor(a.id, submissions);
+          return (
+            <div
+              key={a.id}
+              className={`flex items-center justify-between px-4 py-3.5 ${i > 0 ? "border-t border-line" : ""}`}
+            >
+              <div>
+                <Link href={`/student/assignments/${a.id}`} className="font-medium text-accent-text hover:underline">
+                  {a.title}
+                </Link>
+                {a.due_at ? (
+                  <p className="text-sm text-muted">Due {new Date(a.due_at).toLocaleDateString()}</p>
+                ) : null}
+              </div>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass[status]}`}>
+                {status}
+              </span>
             </div>
-            <span className="text-sm">{statusFor(a.id, submissions)}</span>
-          </li>
-        ))}
-      </ul>
+          );
+        })}
+      </div>
     </main>
   );
 }

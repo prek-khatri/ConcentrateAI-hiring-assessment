@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiClientError } from "@/lib/api";
 
@@ -12,7 +11,6 @@ type ClassSummary = {
 };
 
 export default function TeacherDashboard() {
-  const router = useRouter();
   const [classes, setClasses] = useState<ClassSummary[] | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -44,69 +42,70 @@ export default function TeacherDashboard() {
     }
   }
 
-  async function handleSignOut() {
-    await apiFetch("/auth/logout", { method: "POST" });
-    router.push("/");
-  }
-
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-8 p-6">
-      <div className="flex items-center justify-between">
+    <main className="mx-auto flex max-w-3xl flex-col gap-8 p-8">
+      <div className="flex items-baseline justify-between">
         <h1 className="text-xl font-semibold">My classes</h1>
-        <button onClick={handleSignOut} className="text-sm underline">
-          Sign out
-        </button>
+        {classes ? <p className="text-xs text-muted">{classes.length} total</p> : null}
       </div>
 
       {error ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
           {error}
         </p>
       ) : null}
 
-      <section className="flex flex-col gap-2">
+      <section className="flex flex-col gap-2.5">
         {classes === null ? (
-          <p className="text-sm text-gray-500">Loading...</p>
+          <p className="text-sm text-muted">Loading...</p>
         ) : classes.length === 0 ? (
-          <p className="text-sm text-gray-500">No classes yet — create your first one below.</p>
+          <p className="text-sm text-muted">No classes yet — create your first one below.</p>
         ) : (
           classes.map((c) => (
             <Link
               key={c.id}
               href={`/teacher/classes/${c.id}`}
-              className="rounded border px-4 py-3 hover:bg-gray-50"
+              className="flex items-center gap-3 rounded-lg border border-line bg-white px-4 py-3.5 transition-colors hover:bg-paper"
             >
-              <p className="font-medium">{c.name}</p>
-              {c.description ? <p className="text-sm text-gray-500">{c.description}</p> : null}
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-accent-soft">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.5 0.14 255)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 8l10-5 10 5-10 5-10-5z" />
+                  <path d="M6 10.5v5c0 1.5 2.5 3 6 3s6-1.5 6-3v-5" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium">{c.name}</p>
+                {c.description ? <p className="text-sm text-muted">{c.description}</p> : null}
+              </div>
             </Link>
           ))
         )}
       </section>
 
-      <section className="flex flex-col gap-3 rounded border p-4">
-        <h2 className="font-medium">Create a class</h2>
-        <form onSubmit={handleCreate} className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-sm">
-            Name
+      <section className="flex flex-col gap-3.5 rounded-lg border border-line bg-white p-5">
+        <h2 className="text-sm font-semibold">Create a class</h2>
+        <form onSubmit={handleCreate} className="flex flex-col gap-3.5">
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="text-xs font-medium text-muted">Name</span>
             <input
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="rounded border px-3 py-2"
+              className="rounded-md border border-line px-3 py-2 outline-none focus:border-accent"
             />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Description (optional)
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="text-xs font-medium text-muted">Description (optional)</span>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="rounded border px-3 py-2"
+              className="rounded-md border border-line px-3 py-2 outline-none focus:border-accent"
             />
           </label>
           <button
             type="submit"
             disabled={pending}
-            className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
+            className="self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {pending ? "Creating..." : "Create class"}
           </button>

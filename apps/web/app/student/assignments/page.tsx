@@ -27,9 +27,12 @@ export default function AssignmentsPage() {
 
   if (error) {
     return (
-      <main className="p-6">
-        <p role="alert">
-          {error} <button onClick={load}>Retry</button>
+      <main className="p-8">
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+          {error}{" "}
+          <button onClick={load} className="font-semibold underline">
+            Retry
+          </button>
         </p>
       </main>
     );
@@ -37,47 +40,51 @@ export default function AssignmentsPage() {
 
   if (assignments === null) {
     return (
-      <main className="p-6">
-        <p>Loading assignments...</p>
+      <main className="p-8">
+        <p className="text-sm text-muted">Loading assignments...</p>
       </main>
     );
   }
 
   if (assignments.length === 0) {
     return (
-      <main className="p-6">
-        <p>No assignments yet.</p>
+      <main className="p-8">
+        <p className="text-sm text-muted">No assignments yet.</p>
       </main>
     );
   }
 
   return (
-    <main className="p-6">
+    <main className="p-8">
       <h1 className="mb-4 text-xl font-semibold">Assignments</h1>
-      <table role="table" className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b">
-            <th className="py-2">Title</th>
-            <th className="py-2">Class</th>
-            <th className="py-2">Due</th>
-            <th className="py-2">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {assignments.map((a) => (
-            <tr key={a.id} className="border-b">
-              <td className="py-2">
-                <Link href={`/student/assignments/${a.id}`} className="underline">
-                  {a.title}
-                </Link>
-              </td>
-              <td className="py-2">{a.className}</td>
-              <td className="py-2">{a.due_at ? new Date(a.due_at).toLocaleDateString() : "—"}</td>
-              <td className="py-2">{statusFor(a)}</td>
+      <div className="overflow-hidden rounded-lg border border-line bg-white">
+        <table role="table" className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-line text-xs font-semibold uppercase tracking-wide text-muted">
+              <th className="px-4 py-2.5 font-semibold">Title</th>
+              <th className="px-4 py-2.5 font-semibold">Class</th>
+              <th className="px-4 py-2.5 font-semibold">Due</th>
+              <th className="px-4 py-2.5 font-semibold">Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {assignments.map((a, i) => (
+              <tr key={a.id} className={i > 0 ? "border-t border-line" : ""}>
+                <td className="px-4 py-3">
+                  <Link href={`/student/assignments/${a.id}`} className="font-medium text-accent-text hover:underline">
+                    {a.title}
+                  </Link>
+                </td>
+                <td className="px-4 py-3 text-muted">{a.className}</td>
+                <td className="px-4 py-3 font-mono text-xs text-muted">
+                  {a.due_at ? new Date(a.due_at).toLocaleDateString() : "—"}
+                </td>
+                <td className="px-4 py-3">{statusFor(a)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </main>
   );
 }

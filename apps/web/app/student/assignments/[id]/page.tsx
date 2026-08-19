@@ -56,9 +56,12 @@ export default function AssignmentDetailPage() {
 
   if (error) {
     return (
-      <main className="p-6">
-        <p role="alert">
-          {error} <button onClick={() => load()}>Retry</button>
+      <main className="p-8">
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+          {error}{" "}
+          <button onClick={() => load()} className="font-semibold underline">
+            Retry
+          </button>
         </p>
       </main>
     );
@@ -66,8 +69,8 @@ export default function AssignmentDetailPage() {
 
   if (data === null) {
     return (
-      <main className="p-6">
-        <p>Loading assignment...</p>
+      <main className="p-8">
+        <p className="text-sm text-muted">Loading assignment...</p>
       </main>
     );
   }
@@ -76,48 +79,48 @@ export default function AssignmentDetailPage() {
   const isGraded = submission?.score !== null && submission?.score !== undefined;
 
   return (
-    <main className="mx-auto max-w-lg p-6">
+    <main className="mx-auto max-w-lg p-8">
       <h1 className="text-xl font-semibold">{assignment.title}</h1>
-      <p className="mt-2 text-gray-700">{assignment.description}</p>
+      <p className="mt-2 text-sm leading-relaxed text-ink/80">{assignment.description}</p>
       {assignment.due_at ? (
-        <p className="mt-1 text-sm text-gray-500">Due {new Date(assignment.due_at).toLocaleDateString()}</p>
+        <p className="mt-1 text-sm text-muted">Due {new Date(assignment.due_at).toLocaleDateString()}</p>
       ) : null}
 
       {isGraded ? (
-        <section className="mt-6 rounded border p-4">
-          <p className="font-medium">Score: {submission!.score}/100</p>
-          <p className="mt-2 text-sm text-gray-700">Teacher Feedback:</p>
-          <p className="text-sm">{submission!.feedback}</p>
+        <section className="mt-6 rounded-lg border border-line bg-white p-5">
+          <p className="font-mono text-lg font-semibold text-success-text">Score: {submission!.score}/100</p>
+          <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted">Teacher Feedback:</p>
+          <p className="mt-1 text-sm leading-relaxed">{submission!.feedback}</p>
         </section>
       ) : (
         <>
           {submission ? (
             <p
               role="status"
-              className="mt-6 rounded border border-green-600 bg-green-50 px-3 py-2 text-sm text-green-700"
+              className="mt-6 flex items-center gap-2 rounded-md border border-success/30 bg-success-soft px-3 py-2 text-sm text-success-text"
             >
               ✓ Submitted on {new Date(submission.submitted_at).toLocaleString()} — you can still update it below.
             </p>
           ) : null}
           <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-sm">
-              Submission
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="text-xs font-medium text-muted">Submission</span>
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={6}
-                className="rounded border px-3 py-2"
+                className="rounded-md border border-line px-3 py-2 outline-none focus:border-accent"
               />
             </label>
             {formError ? (
-              <p role="alert" className="text-sm text-red-600">
+              <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
                 {formError}
               </p>
             ) : null}
             <button
               type="submit"
               disabled={pending}
-              className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
+              className="self-start rounded-md bg-accent px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {pending ? "Submitting..." : submission ? "Update Submission" : "Submit Assignment"}
             </button>

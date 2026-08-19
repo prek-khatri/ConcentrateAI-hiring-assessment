@@ -34,53 +34,85 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 p-6">
-      <h1 className="text-xl font-semibold">Sign in</h1>
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded border px-3 py-2"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Password
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded border px-3 py-2"
-          />
-        </label>
-
-        {error ? (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
+    <main className="flex min-h-screen">
+      <div className="hidden w-[420px] flex-shrink-0 flex-col justify-between bg-sidebar p-12 lg:flex">
+        <div className="flex items-center gap-2.5">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0.1 255)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 8l10-5 10 5-10 5-10-5z" />
+            <path d="M6 10.5v5c0 1.5 2.5 3 6 3s6-1.5 6-3v-5" />
+          </svg>
+          <span className="text-[15px] font-semibold text-white">Concentrate</span>
+        </div>
+        <div className="flex flex-col gap-3.5">
+          <p className="max-w-[340px] text-[22px] font-semibold leading-snug text-white">
+            Classes, assignments, and grading — in one place.
           </p>
-        ) : null}
+          <p className="max-w-[340px] text-sm leading-relaxed text-sidebar-text">
+            Built for admins, teachers, and students. Sign in with your school account to continue.
+          </p>
+        </div>
+        <p className="font-mono text-xs text-sidebar-muted">v1.0</p>
+      </div>
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
-          {pending ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="flex w-full max-w-sm flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <h1 className="text-xl font-semibold">Sign in</h1>
+            <p className="text-sm text-muted">Use your school email and password.</p>
+          </div>
 
-      <a
-        href={`${API_URL}/auth/google`}
-        className="flex items-center justify-center gap-2 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-      >
-        <GoogleIcon />
-        Sign in with Google
-      </a>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="text-xs font-medium text-muted">Email</span>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="rounded-md border border-line px-3 py-2.5 outline-none focus:border-accent"
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="text-xs font-medium text-muted">Password</span>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="rounded-md border border-line px-3 py-2.5 outline-none focus:border-accent"
+              />
+            </label>
+
+            {error ? (
+              <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
+                {error}
+              </p>
+            ) : null}
+
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-md bg-accent px-3 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {pending ? "Signing in..." : "Sign in"}
+            </button>
+          </form>
+
+          <div className="flex items-center gap-2.5 text-xs text-muted">
+            <div className="h-px flex-1 bg-line" />
+            or
+            <div className="h-px flex-1 bg-line" />
+          </div>
+
+          <a
+            href={`${API_URL}/auth/google`}
+            className="flex items-center justify-center gap-2.5 rounded-md border border-line bg-white px-3 py-2.5 text-sm font-medium text-ink shadow-sm hover:bg-paper"
+          >
+            <GoogleIcon />
+            Sign in with Google
+          </a>
+        </div>
+      </div>
     </main>
   );
 }

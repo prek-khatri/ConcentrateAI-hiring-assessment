@@ -1,14 +1,10 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-const pushMock = vi.fn();
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock }) }));
-
 import TeacherDashboard from "./page";
 
 afterEach(() => {
   vi.restoreAllMocks();
-  pushMock.mockClear();
 });
 
 function mockFetchOnce(response: { ok: boolean; status: number; json: () => unknown }) {
@@ -127,19 +123,5 @@ describe("TeacherDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: /create class/i }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Name is required"));
-  });
-
-  it("signs out and redirects to login", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ classes: [] }) })
-      .mockResolvedValueOnce({ ok: true, status: 204, json: async () => ({}) });
-    vi.stubGlobal("fetch", fetchMock);
-
-    render(<TeacherDashboard />);
-    await waitFor(() => expect(screen.getByText(/no classes yet/i)).toBeInTheDocument());
-
-    fireEvent.click(screen.getByRole("button", { name: /sign out/i }));
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
   });
 });

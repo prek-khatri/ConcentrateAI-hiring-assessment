@@ -45,22 +45,35 @@ export function ChatWidget() {
   return (
     <div className="fixed bottom-4 right-4 z-50">
       {open ? (
-        <div className="flex h-96 w-80 flex-col rounded-lg border bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b px-3 py-2">
-            <span className="text-sm font-medium">Assistant</span>
-            <button onClick={() => setOpen(false)} aria-label="Close chat" className="text-gray-500">
-              ×
+        <div className="flex h-96 w-80 flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+          <div className="flex flex-shrink-0 items-center justify-between bg-sidebar px-4 py-3.5">
+            <div className="flex items-center gap-2">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0.1 255)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+              </svg>
+              <span className="text-sm font-semibold text-white">Assistant</span>
+            </div>
+            <button
+              onClick={() => setOpen(false)}
+              aria-label="Close chat"
+              className="flex h-[22px] w-[22px] items-center justify-center rounded-md text-sidebar-muted hover:text-white"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 text-sm">
+          <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3.5 text-sm">
             {messages.length === 0 ? (
-              <p className="text-gray-500">Ask about your classes, assignments, or grades.</p>
+              <p className="text-muted">Ask about your classes, assignments, or grades.</p>
             ) : (
               messages.map((m, i) => (
-                <p key={i} className={m.role === "user" ? "mb-2 text-right" : "mb-2 text-left"}>
+                <p key={i} className={m.role === "user" ? "self-end text-right" : "self-start text-left"}>
                   <span
-                    className={`inline-block rounded px-2 py-1 ${
-                      m.role === "user" ? "bg-black text-white" : "bg-gray-100"
+                    className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-xl px-3 py-2 text-[13px] leading-relaxed ${
+                      m.role === "user"
+                        ? "rounded-br-sm bg-accent text-white"
+                        : "rounded-bl-sm bg-paper text-ink"
                     }`}
                   >
                     {m.content}
@@ -69,33 +82,40 @@ export function ChatWidget() {
               ))
             )}
             {error ? (
-              <p role="alert" className="text-red-600">
+              <p role="alert" className="text-danger">
                 {error}
               </p>
             ) : null}
           </div>
-          <form onSubmit={handleSend} className="flex gap-2 border-t p-2">
+          <form onSubmit={handleSend} className="flex flex-shrink-0 gap-2 border-t border-line p-2.5">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask a question..."
-              className="flex-1 rounded border px-2 py-1 text-sm"
+              className="flex-1 rounded-lg border border-line px-2.5 py-2 text-[13px] outline-none focus:border-accent"
             />
             <button
               type="submit"
               disabled={pending}
-              className="rounded bg-black px-3 py-1 text-sm text-white disabled:opacity-50"
+              aria-label="Send"
+              className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-lg bg-accent text-white disabled:opacity-50"
             >
-              Send
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 2L11 13" />
+                <path d="M22 2l-7 20-4-9-9-4 20-7z" />
+              </svg>
             </button>
           </form>
         </div>
       ) : (
         <button
           onClick={() => setOpen(true)}
-          className="rounded-full bg-black px-4 py-3 text-sm text-white shadow-lg"
+          aria-label="Chat"
+          className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-accent shadow-lg shadow-accent/35"
         >
-          Chat
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
+          </svg>
         </button>
       )}
     </div>

@@ -49,42 +49,63 @@ function SubmissionRow({ submission, onGraded }: { submission: Submission; onGra
     }
   }
 
-  return (
-    <li className="flex flex-col gap-2 rounded border p-3 text-sm">
-      <div className="flex items-center justify-between">
-        <span className="font-medium">{submission.studentName}</span>
-        <span className="text-gray-500">{new Date(submission.submitted_at).toLocaleString()}</span>
-      </div>
-      <p className="whitespace-pre-wrap text-gray-700">{submission.content}</p>
+  const initials = submission.studentName
+    .split(" ")
+    .map((p) => p[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
-      <form onSubmit={handleGrade} className="flex flex-col gap-2 border-t pt-2">
-        <div className="flex gap-2">
-          <input
-            type="number"
-            min={0}
-            max={100}
-            required
-            placeholder="Score"
-            value={score}
-            onChange={(e) => setScore(e.target.value)}
-            className="w-24 rounded border px-2 py-1"
-          />
+  return (
+    <li className="flex flex-col gap-3 rounded-lg border border-line bg-white p-5">
+      <div className="flex items-center gap-2.5">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-accent-soft text-xs font-semibold text-accent-text">
+          {initials}
+        </div>
+        <div>
+          <p className="text-sm font-semibold">{submission.studentName}</p>
+          <p className="font-mono text-xs text-muted">{new Date(submission.submitted_at).toLocaleString()}</p>
+        </div>
+      </div>
+
+      <p className="whitespace-pre-wrap rounded-md border border-line bg-paper px-4 py-3 text-sm leading-relaxed text-ink">
+        {submission.content}
+      </p>
+
+      <form onSubmit={handleGrade} className="flex flex-col gap-2.5 border-t border-line pt-3.5">
+        <div className="flex items-center gap-2.5">
+          <label className="flex items-center gap-2 text-xs font-medium text-muted">
+            Score
+            <span className="flex items-baseline gap-1">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                required
+                placeholder="Score"
+                value={score}
+                onChange={(e) => setScore(e.target.value)}
+                className="w-16 rounded-md border border-line px-2 py-1.5 text-center font-mono text-sm font-semibold text-ink outline-none focus:border-accent"
+              />
+              <span className="font-mono text-xs">/ 100</span>
+            </span>
+          </label>
           <input
             placeholder="Feedback (optional)"
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            className="flex-1 rounded border px-2 py-1"
+            className="flex-1 rounded-md border border-line px-3 py-1.5 text-sm outline-none focus:border-accent"
           />
         </div>
         {error ? (
-          <p role="alert" className="text-red-600">
+          <p role="alert" className="text-danger">
             {error}
           </p>
         ) : null}
         <button
           type="submit"
           disabled={pending}
-          className="self-start rounded bg-black px-3 py-1 text-white disabled:opacity-50"
+          className="self-start rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {submission.score !== null ? "Update grade" : "Save grade"}
         </button>
@@ -157,49 +178,60 @@ export default function AssignmentDetailPage() {
   }
 
   if (!detail) {
-    return <main className="mx-auto max-w-2xl p-6 text-sm text-gray-500">{error ?? "Loading..."}</main>;
+    return <main className="mx-auto max-w-2xl p-8 text-sm text-muted">{error ?? "Loading..."}</main>;
   }
 
+  const graded = detail.submissions.filter((s) => s.score !== null);
+  const avgScore = graded.length
+    ? Math.round(graded.reduce((sum, s) => sum + Number(s.score), 0) / graded.length)
+    : null;
+  const needsGrading = detail.submissions.length - graded.length;
+
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-8 p-6">
+    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
       <div>
-        <Link href={`/teacher/classes/${detail.assignment.class_id}`} className="text-sm underline">
+        <Link href={`/teacher/classes/${detail.assignment.class_id}`} className="text-sm text-muted hover:text-ink">
           &larr; Back to class
         </Link>
 
         {editing ? (
-          <form onSubmit={handleSave} className="mt-2 flex flex-col gap-2">
+          <form onSubmit={handleSave} className="mt-2 flex flex-col gap-2.5">
             <input
               required
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
-              className="rounded border px-3 py-2 text-xl font-semibold"
+              className="rounded-md border border-line px-3 py-2 text-xl font-semibold outline-none focus:border-accent"
             />
             <input
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
               placeholder="Description (optional)"
-              className="rounded border px-3 py-2 text-sm"
+              className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-accent"
             />
             <input
               type="date"
               value={editDueAt}
               onChange={(e) => setEditDueAt(e.target.value)}
-              className="rounded border px-3 py-2 text-sm"
+              className="rounded-md border border-line px-3 py-2 text-sm outline-none focus:border-accent"
             />
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={editPublished}
                 onChange={(e) => setEditPublished(e.target.checked)}
+                className="accent-accent"
               />
               Published (visible to students)
             </label>
             <div className="flex gap-2">
-              <button type="submit" className="rounded bg-black px-3 py-2 text-sm text-white">
+              <button type="submit" className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-white">
                 Save
               </button>
-              <button type="button" onClick={() => setEditing(false)} className="rounded border px-3 py-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="rounded-md border border-line px-3 py-2 text-sm"
+              >
                 Cancel
               </button>
             </div>
@@ -209,9 +241,9 @@ export default function AssignmentDetailPage() {
             <div>
               <h1 className="text-xl font-semibold">{detail.assignment.title}</h1>
               {detail.assignment.description ? (
-                <p className="text-sm text-gray-500">{detail.assignment.description}</p>
+                <p className="text-sm text-muted">{detail.assignment.description}</p>
               ) : null}
-              <p className="text-sm text-gray-500">
+              <p className="mt-1 text-sm text-muted">
                 {detail.assignment.published ? "Published" : "Draft"}
                 {detail.assignment.due_at
                   ? ` · Due ${new Date(detail.assignment.due_at).toLocaleDateString()}`
@@ -219,10 +251,10 @@ export default function AssignmentDetailPage() {
               </p>
             </div>
             <div className="flex gap-3 text-sm">
-              <button onClick={startEditing} className="underline">
+              <button onClick={startEditing} className="font-medium text-muted hover:text-ink">
                 Edit
               </button>
-              <button onClick={handleDelete} className="text-red-600 underline">
+              <button onClick={handleDelete} className="font-medium text-danger hover:opacity-80">
                 Delete
               </button>
             </div>
@@ -231,15 +263,35 @@ export default function AssignmentDetailPage() {
       </div>
 
       {error ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
           {error}
         </p>
       ) : null}
 
+      {detail.submissions.length > 0 ? (
+        <div className="flex gap-8 rounded-lg border border-line bg-white px-6 py-4">
+          <div>
+            <p className="font-mono text-xl font-semibold">{avgScore ?? "—"}</p>
+            <p className="text-xs text-muted">Average score</p>
+          </div>
+          <div>
+            <p className="font-mono text-xl font-semibold">
+              {detail.submissions.length}
+              <span className="text-sm font-normal text-muted"> submitted</span>
+            </p>
+            <p className="text-xs text-muted">Submissions</p>
+          </div>
+          <div>
+            <p className="font-mono text-xl font-semibold text-warn">{needsGrading}</p>
+            <p className="text-xs text-muted">Needs grading</p>
+          </div>
+        </div>
+      ) : null}
+
       <section className="flex flex-col gap-3">
-        <h2 className="font-medium">Submissions</h2>
+        <h2 className="text-base font-semibold">Submissions</h2>
         {detail.submissions.length === 0 ? (
-          <p className="text-sm text-gray-500">No submissions yet.</p>
+          <p className="text-sm text-muted">No submissions yet.</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {detail.submissions.map((s) => (
