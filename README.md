@@ -9,6 +9,10 @@ the whole app deployable as a single Docker image.
 
 See `PLANNING.md` for the team task split.
 
+## Demo video
+
+[Watch the walkthrough](https://drive.google.com/file/d/1pmCRHaWBdVfYoyMa1T2wXVI94wsR25cS/view?usp=sharing)
+
 ## Screenshots
 
 A quick tour of each role, plus the chatbot extra credit — see [Local
