@@ -1,8 +1,18 @@
 # Concentrate School Portal
 
+A Canvas-style school portal built for the Concentrate.ai hiring assessment.
+Admins manage users and teacher groups, teachers run their classes and grade
+submissions, students turn in work and track their grades, and a JWT-protected
+stats API exposes school-wide metrics for external integration. The stack is
+Next.js and Fastify on Postgres, with 100% test coverage enforced in CI and
+the whole app deployable as a single Docker image.
+
 See `PLANNING.md` for the team task split.
 
 ## Screenshots
+
+A quick tour of each role, plus the chatbot extra credit — see [Local
+development](#local-development) below to run it yourself.
 
 **Login**
 
