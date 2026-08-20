@@ -1,7 +1,20 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { apiFetch, ApiClientError } from "./api";
 
-afterEach(() => vi.restoreAllMocks());
+const originalLocation = window.location;
+
+function setPathname(pathname: string) {
+  Object.defineProperty(window, "location", {
+    value: { pathname, href: `http://localhost:3000${pathname}` },
+    writable: true,
+    configurable: true,
+  });
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  Object.defineProperty(window, "location", { value: originalLocation, writable: true, configurable: true });
+});
 
 describe("apiFetch", () => {
   it("returns parsed JSON on success", async () => {
@@ -50,5 +63,26 @@ describe("apiFetch", () => {
     await apiFetch("/auth/logout", { method: "POST" });
     const [, options] = fetchMock.mock.calls[0];
     expect(options.headers["Content-Type"]).toBeUndefined();
+  });
+
+  it("sends an expired/invalid session back to login on a 401", async () => {
+    setPathname("/teacher");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: { code: "UNAUTHORIZED", message: "Invalid or expired session" } }),
+      })
+    );
+    await apiFetch("/api/teacher/classes").catch(() => {});
+    expect(window.location.href).toBe("/");
+  });
+
+  it("does not bounce-redirect a 401 that happens on the login page itself", async () => {
+    setPathname("/");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: {} }) }));
+    await apiFetch("/api/auth/me").catch(() => {});
+    expect(window.location.href).toBe("http://localhost:3000/");
   });
 });
