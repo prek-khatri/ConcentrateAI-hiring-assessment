@@ -74,6 +74,12 @@ describe("GET /api/v0/stats/average-grades", () => {
     const res = await get(`/api/v0/stats/average-grades/${MISSING_ID}`, studentCookie);
     expect(res.statusCode).toBe(404);
   });
+
+  it("400s for a malformed class id instead of crashing on a raw DB error", async () => {
+    const res = await get("/api/v0/stats/average-grades/not-a-uuid", studentCookie);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe("VALIDATION_ERROR");
+  });
 });
 
 describe("name and class listings", () => {
@@ -102,5 +108,11 @@ describe("name and class listings", () => {
   it("404s listing students for an unknown class", async () => {
     const res = await get(`/api/v0/stats/classes/${MISSING_ID}`, studentCookie);
     expect(res.statusCode).toBe(404);
+  });
+
+  it("400s listing students for a malformed class id", async () => {
+    const res = await get("/api/v0/stats/classes/not-a-uuid", studentCookie);
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe("VALIDATION_ERROR");
   });
 });
