@@ -26,3 +26,5 @@ npm-debug.log*
 
 # Next.js generated types
 apps/web/next-env.d.ts
+
+SPECS.md
