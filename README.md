@@ -21,6 +21,7 @@ development](#local-development) below to run it yourself.
 **Login**
 
 <img width="700" alt="Login page" src="https://github.com/user-attachments/assets/ac001698-5714-4118-9dfa-df76c031c076" />
+<img width="700" height="800" alt="image" src="https://github.com/user-attachments/assets/95bfa2e9-8a90-4075-9be6-5a916c35df42" />
 
 **Admin**
 
