@@ -9,7 +9,7 @@ import StudentLayout from "./layout";
 afterEach(() => vi.restoreAllMocks());
 
 describe("StudentLayout", () => {
-  it("renders the top bar, sidebar, and page content", async () => {
+  it("renders the sidebar with a sign-out control and the page content", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: {} }) }));
     render(
       <StudentLayout>
@@ -17,5 +17,6 @@ describe("StudentLayout", () => {
       </StudentLayout>
     );
     expect(screen.getByText("page content")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /sign out/i })).toBeInTheDocument();
   });
 });
