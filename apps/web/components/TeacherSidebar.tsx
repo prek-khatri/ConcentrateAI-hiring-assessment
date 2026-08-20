@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
+import { onClassesChanged } from "@/lib/teacher-events";
 import { AppSidebar, type SidebarNavItem } from "./AppSidebar";
 
 type ClassSummary = { id: string; name: string };
@@ -13,9 +14,13 @@ export function TeacherSidebar() {
   const [classes, setClasses] = useState<ClassSummary[]>([]);
 
   useEffect(() => {
-    apiFetch<{ classes: ClassSummary[] }>("/api/teacher/classes")
-      .then((data) => setClasses(data.classes))
-      .catch(() => {});
+    function load() {
+      apiFetch<{ classes: ClassSummary[] }>("/api/teacher/classes")
+        .then((data) => setClasses(data.classes))
+        .catch(() => {});
+    }
+    load();
+    return onClassesChanged(load);
   }, []);
 
   const items: SidebarNavItem[] = classes.map((c) => ({

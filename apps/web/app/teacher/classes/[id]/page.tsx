@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiClientError } from "@/lib/api";
+import { notifyClassesChanged } from "@/lib/teacher-events";
 
 type ClassDetail = {
   class: { id: string; name: string; description: string | null };
@@ -84,6 +85,7 @@ export default function ClassDetailPage() {
       });
       setEditingClass(false);
       await loadDetail();
+      notifyClassesChanged();
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Could not update class.");
     }
@@ -94,6 +96,7 @@ export default function ClassDetailPage() {
     setError(null);
     try {
       await apiFetch(`/api/teacher/classes/${classId}`, { method: "DELETE" });
+      notifyClassesChanged();
       router.push("/teacher");
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Could not delete class.");

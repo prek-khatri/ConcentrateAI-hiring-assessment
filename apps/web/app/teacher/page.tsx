@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { apiFetch, ApiClientError } from "@/lib/api";
+import { notifyClassesChanged } from "@/lib/teacher-events";
 
 type ClassSummary = {
   id: string;
@@ -35,6 +36,7 @@ export default function TeacherDashboard() {
       setClasses((prev) => [created, ...(prev ?? [])]);
       setName("");
       setDescription("");
+      notifyClassesChanged();
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Could not create the class.");
     } finally {

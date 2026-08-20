@@ -5,6 +5,7 @@ const { pathnameMock } = vi.hoisted(() => ({ pathnameMock: vi.fn() }));
 vi.mock("next/navigation", () => ({ usePathname: () => pathnameMock(), useRouter: () => ({ push: vi.fn() }) }));
 
 import { TeacherSidebar } from "./TeacherSidebar";
+import { notifyClassesChanged } from "@/lib/teacher-events";
 
 function fetchMockFor(classesOk: boolean) {
   return vi.fn((url: string) => {
@@ -53,5 +54,35 @@ describe("TeacherSidebar", () => {
 
     await waitFor(() => expect(screen.getByText("My classes")).toBeInTheDocument());
     expect(screen.queryByRole("link", { name: /biology 101/i })).not.toBeInTheDocument();
+  });
+
+  it("drops a deleted class the moment another page reports the list changed, without a reload", async () => {
+    // Regression test: the sidebar lives in the persistent layout, so it never remounts
+    // (and never refetches) on client-side navigation. Before notifyClassesChanged, a
+    // class deleted from its detail page kept showing in the sidebar until a full reload.
+    pathnameMock.mockReturnValue("/teacher");
+    const fetchMock = fetchMockFor(true);
+    vi.stubGlobal("fetch", fetchMock);
+    render(<TeacherSidebar />);
+    await screen.findByRole("link", { name: /biology 101/i });
+
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes("/api/auth/me")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ id: "1", name: "Terry Teacher", email: "teacher@example.com", role: "teacher" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ classes: [{ id: "bio", name: "Biology 101" }] }),
+      });
+    });
+    notifyClassesChanged();
+
+    await waitFor(() => expect(screen.queryByRole("link", { name: /chemistry class/i })).not.toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /biology 101/i })).toBeInTheDocument();
   });
 });
