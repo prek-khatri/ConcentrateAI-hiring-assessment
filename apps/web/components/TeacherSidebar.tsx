@@ -1,42 +1,46 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { apiFetch } from "@/lib/api";
+import { AppSidebar, type SidebarNavItem } from "./AppSidebar";
 
-const NAV_ITEMS = [
-  {
-    label: "My classes",
-    href: "/teacher",
-    icon: (
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2 8l10-5 10 5-10 5-10-5z" />
-        <path d="M6 10.5v5c0 1.5 2.5 3 6 3s6-1.5 6-3v-5" />
-      </svg>
-    ),
-  },
-];
+type ClassSummary = { id: string; name: string };
 
 export function TeacherSidebar() {
   const pathname = usePathname();
+  const [classes, setClasses] = useState<ClassSummary[]>([]);
+
+  useEffect(() => {
+    apiFetch<{ classes: ClassSummary[] }>("/api/teacher/classes")
+      .then((data) => setClasses(data.classes))
+      .catch(() => {});
+  }, []);
+
+  const items: SidebarNavItem[] = classes.map((c) => ({
+    key: c.id,
+    label: c.name,
+    href: `/teacher/classes/${c.id}`,
+    active: pathname === `/teacher/classes/${c.id}`,
+  }));
 
   return (
-    <nav aria-label="Teacher navigation" className="flex w-56 shrink-0 flex-col gap-1 border-r border-line bg-white p-4">
-      {NAV_ITEMS.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-              active ? "bg-accent-soft text-accent-text" : "text-muted hover:bg-paper hover:text-ink"
-            }`}
-          >
-            {item.icon}
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <AppSidebar
+      ariaLabel="Teacher navigation"
+      sectionLabel="My classes"
+      items={items}
+      footer={
+        <Link
+          href="/teacher"
+          className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-sidebar-muted transition-colors hover:bg-sidebar-active/60 hover:text-white"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          New class
+        </Link>
+      }
+    />
   );
 }

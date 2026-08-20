@@ -100,7 +100,7 @@ export default function AdminPage() {
         </p>
       ) : null}
 
-      <section className="flex flex-col gap-3.5">
+      <section id="users" className="flex flex-col gap-3.5 scroll-mt-8">
         <h2 className="text-base font-semibold">Users</h2>
 
         <form
@@ -239,7 +239,7 @@ export default function AdminPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-3.5">
+      <section id="teacher-groups" className="flex flex-col gap-3.5 scroll-mt-8">
         <h2 className="text-base font-semibold">Teacher groups</h2>
 
         <form
