@@ -1,6 +1,18 @@
 # Concentrate School Portal
 
-See `PLANNING.md` for the team task split and `SPECS.md` for the original brief.
+See `PLANNING.md` for the team task split.
+
+## Screenshots
+
+<!-- Admin -->
+![Admin dashboard](docs/screenshots/admin.png)
+
+<!-- Teacher -->
+![Teacher class view](docs/screenshots/teacher-class.png)
+![Teacher grading view](docs/screenshots/teacher-grading.png)
+
+<!-- Student -->
+![Student dashboard](docs/screenshots/student.png)
 
 ## Local development
 
