@@ -21,6 +21,8 @@ test("an admin signs in and sees the user list on the admin dashboard", async ({
 
 test("an admin can create and delete a teacher group", async ({ page }) => {
   await loginAsAdmin(page);
+  await page.getByRole("link", { name: "Teacher groups" }).click();
+  await expect(page.getByRole("heading", { name: "Teacher groups" })).toBeVisible();
 
   const name = "E2E Temp Group";
   await page.getByLabel("New group name").fill(name);
