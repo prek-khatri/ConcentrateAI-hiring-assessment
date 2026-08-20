@@ -1,0 +1,131 @@
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import AdminGroupsPage from "./page";
+
+const USERS = {
+  users: [
+    { id: "u-admin", email: "admin@x", name: "Ada", role: "admin", is_suspended: false },
+    { id: "u-teacher", email: "terry@x", name: "Terry", role: "teacher", is_suspended: false },
+    { id: "u-student", email: "sam@x", name: "Sam", role: "student", is_suspended: false },
+  ],
+};
+const GROUPS = { groups: [{ id: "g1", name: "Science" }] };
+const GROUP1 = { id: "g1", name: "Science", members: [{ id: "u-teacher", name: "Terry", email: "terry@x" }] };
+
+function routeData(url: string): unknown {
+  if (url.endsWith("/api/admin/users")) return USERS;
+  if (url.endsWith("/api/admin/groups")) return GROUPS;
+  if (url.endsWith("/api/admin/groups/g1")) return GROUP1;
+  return {};
+}
+
+function stubFetchOk() {
+  const fetchMock = vi.fn(async (url: string, opts: RequestInit = {}) => {
+    const method = opts.method ?? "GET";
+    const json = async () => routeData(String(url));
+    if (method === "DELETE") return { ok: true, status: 204, json } as Response;
+    return { ok: true, status: 200, json } as Response;
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function called(fetchMock: ReturnType<typeof vi.fn>, urlEnd: string, method: string) {
+  return fetchMock.mock.calls.some(
+    ([url, opts]) => String(url).endsWith(urlEnd) && (opts?.method ?? "GET") === method
+  );
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+async function renderLoaded() {
+  const fetchMock = stubFetchOk();
+  render(<AdminGroupsPage />);
+  await screen.findByLabelText("Group name for Science");
+  return fetchMock;
+}
+
+describe("AdminGroupsPage", () => {
+  it("renders groups and members after loading", async () => {
+    await renderLoaded();
+    expect(screen.getByRole("button", { name: /remove terry/i })).toBeInTheDocument();
+  });
+
+  it("creates a group", async () => {
+    const fetchMock = await renderLoaded();
+    fireEvent.change(screen.getByLabelText("New group name"), { target: { value: "Arts" } });
+    fireEvent.click(screen.getByRole("button", { name: /add group/i }));
+    await waitFor(() => expect(called(fetchMock, "/api/admin/groups", "POST")).toBe(true));
+  });
+
+  it("renames a group", async () => {
+    const fetchMock = await renderLoaded();
+    fireEvent.change(screen.getByLabelText("Group name for Science"), { target: { value: "Science II" } });
+    fireEvent.click(screen.getByRole("button", { name: /save name/i }));
+    await waitFor(() => expect(called(fetchMock, "/api/admin/groups/g1", "PATCH")).toBe(true));
+  });
+
+  it("saves the unchanged name when the field is not edited", async () => {
+    const fetchMock = await renderLoaded();
+    fireEvent.click(screen.getByRole("button", { name: /save name/i }));
+    await waitFor(() => expect(called(fetchMock, "/api/admin/groups/g1", "PATCH")).toBe(true));
+  });
+
+  it("deletes a group", async () => {
+    const fetchMock = await renderLoaded();
+    fireEvent.click(screen.getByRole("button", { name: /delete group/i }));
+    await waitFor(() => expect(called(fetchMock, "/api/admin/groups/g1", "DELETE")).toBe(true));
+  });
+
+  it("adds a selected teacher to a group", async () => {
+    const fetchMock = await renderLoaded();
+    fireEvent.change(screen.getByLabelText("Add teacher to Science"), { target: { value: "u-teacher" } });
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+    await waitFor(() => expect(called(fetchMock, "/api/admin/groups/g1/members", "POST")).toBe(true));
+  });
+
+  it("does nothing when adding with no teacher selected", async () => {
+    const fetchMock = await renderLoaded();
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(called(fetchMock, "/api/admin/groups/g1/members", "POST")).toBe(false);
+  });
+
+  it("removes a member", async () => {
+    const fetchMock = await renderLoaded();
+    fireEvent.click(screen.getByRole("button", { name: /remove terry/i }));
+    await waitFor(() =>
+      expect(called(fetchMock, "/api/admin/groups/g1/members/u-teacher", "DELETE")).toBe(true)
+    );
+  });
+
+  it("shows the API error message when a request fails", async () => {
+    const fetchMock = vi.fn(async (url: string, opts: RequestInit = {}) => {
+      const method = opts.method ?? "GET";
+      if (method === "POST" && String(url).endsWith("/api/admin/groups")) {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({ error: { code: "CONFLICT", message: "Group name already in use" } }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => routeData(String(url)) } as Response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<AdminGroupsPage />);
+    await screen.findByLabelText("Group name for Science");
+    fireEvent.change(screen.getByLabelText("New group name"), { target: { value: "Dupe" } });
+    fireEvent.click(screen.getByRole("button", { name: /add group/i }));
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/group name already in use/i));
+  });
+
+  it("shows a generic error when the network fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
+    render(<AdminGroupsPage />);
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/something went wrong/i));
+  });
+});

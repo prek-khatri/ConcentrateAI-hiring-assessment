@@ -10,21 +10,16 @@ const USERS = {
     { id: "u-susp", email: "suzy@x", name: "Suzy", role: "student", is_suspended: true },
   ],
 };
-const GROUPS = { groups: [{ id: "g1", name: "Science" }] };
-const GROUP1 = { id: "g1", name: "Science", members: [{ id: "u-teacher", name: "Terry", email: "terry@x" }] };
 
-function routeData(url: string, method: string): unknown {
-  if (method === "GET" && url.endsWith("/api/admin/users")) return USERS;
-  if (method === "GET" && url.endsWith("/api/admin/groups")) return GROUPS;
-  if (method === "GET" && url.endsWith("/api/admin/groups/g1")) return GROUP1;
+function routeData(url: string): unknown {
+  if (url.endsWith("/api/admin/users")) return USERS;
   return {};
 }
 
-// Default happy-path fetch: routes reads, and 204/200-OKs every mutation.
 function stubFetchOk() {
   const fetchMock = vi.fn(async (url: string, opts: RequestInit = {}) => {
     const method = opts.method ?? "GET";
-    const json = async () => routeData(String(url), method);
+    const json = async () => routeData(String(url));
     if (method === "DELETE") return { ok: true, status: 204, json } as Response;
     return { ok: true, status: 200, json } as Response;
   });
@@ -50,12 +45,11 @@ async function renderLoaded() {
 }
 
 describe("AdminPage", () => {
-  it("renders users (active + suspended) and groups after loading", async () => {
+  it("renders users (active + suspended) after loading", async () => {
     await renderLoaded();
     expect(screen.getByText("terry@x")).toBeInTheDocument();
     expect(screen.getByText("Suspended")).toBeInTheDocument();
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /remove terry/i })).toBeInTheDocument();
   });
 
   it("creates a user from the form", async () => {
@@ -88,55 +82,6 @@ describe("AdminPage", () => {
     await waitFor(() => expect(called(fetchMock, "/api/admin/users/u-admin", "DELETE")).toBe(true));
   });
 
-  it("creates a group", async () => {
-    const fetchMock = await renderLoaded();
-    fireEvent.change(screen.getByLabelText("New group name"), { target: { value: "Arts" } });
-    fireEvent.click(screen.getByRole("button", { name: /add group/i }));
-    await waitFor(() => expect(called(fetchMock, "/api/admin/groups", "POST")).toBe(true));
-  });
-
-  it("renames a group", async () => {
-    const fetchMock = await renderLoaded();
-    fireEvent.change(screen.getByLabelText("Group name for Science"), { target: { value: "Science II" } });
-    fireEvent.click(screen.getByRole("button", { name: /save name/i }));
-    await waitFor(() => expect(called(fetchMock, "/api/admin/groups/g1", "PATCH")).toBe(true));
-  });
-
-  it("saves the unchanged name when the field is not edited", async () => {
-    const fetchMock = await renderLoaded();
-    fireEvent.click(screen.getByRole("button", { name: /save name/i }));
-    await waitFor(() => expect(called(fetchMock, "/api/admin/groups/g1", "PATCH")).toBe(true));
-  });
-
-  it("deletes a group", async () => {
-    const fetchMock = await renderLoaded();
-    fireEvent.click(screen.getByRole("button", { name: /delete group/i }));
-    await waitFor(() => expect(called(fetchMock, "/api/admin/groups/g1", "DELETE")).toBe(true));
-  });
-
-  it("adds a selected teacher to a group", async () => {
-    const fetchMock = await renderLoaded();
-    fireEvent.change(screen.getByLabelText("Add teacher to Science"), { target: { value: "u-teacher" } });
-    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
-    await waitFor(() => expect(called(fetchMock, "/api/admin/groups/g1/members", "POST")).toBe(true));
-  });
-
-  it("does nothing when adding with no teacher selected", async () => {
-    const fetchMock = await renderLoaded();
-    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
-    // give any async a tick; no members POST should be issued
-    await new Promise((r) => setTimeout(r, 0));
-    expect(called(fetchMock, "/api/admin/groups/g1/members", "POST")).toBe(false);
-  });
-
-  it("removes a member", async () => {
-    const fetchMock = await renderLoaded();
-    fireEvent.click(screen.getByRole("button", { name: /remove terry/i }));
-    await waitFor(() =>
-      expect(called(fetchMock, "/api/admin/groups/g1/members/u-teacher", "DELETE")).toBe(true)
-    );
-  });
-
   it("shows the API error message when a request fails", async () => {
     const fetchMock = vi.fn(async (url: string, opts: RequestInit = {}) => {
       const method = opts.method ?? "GET";
@@ -147,7 +92,7 @@ describe("AdminPage", () => {
           json: async () => ({ error: { code: "CONFLICT", message: "Email already in use" } }),
         } as Response;
       }
-      return { ok: true, status: 200, json: async () => routeData(String(url), method) } as Response;
+      return { ok: true, status: 200, json: async () => routeData(String(url)) } as Response;
     });
     vi.stubGlobal("fetch", fetchMock);
 

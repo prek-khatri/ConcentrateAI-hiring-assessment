@@ -9,18 +9,28 @@ import { AdminSidebar } from "./AdminSidebar";
 afterEach(() => vi.restoreAllMocks());
 
 describe("AdminSidebar", () => {
-  it("marks Users active on the admin page", () => {
+  it("marks Users active on the admin users page", () => {
     pathnameMock.mockReturnValue("/admin");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: {} }) }));
     render(<AdminSidebar />);
     expect(screen.getByRole("link", { name: /^users$/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: /teacher groups/i })).toHaveAttribute("href", "/admin#teacher-groups");
+    expect(screen.getByRole("link", { name: /teacher groups/i })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: /teacher groups/i })).toHaveAttribute("href", "/admin/groups");
   });
 
-  it("does not mark it active outside the admin section", () => {
+  it("marks Teacher groups active on the groups page", () => {
+    pathnameMock.mockReturnValue("/admin/groups");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: {} }) }));
+    render(<AdminSidebar />);
+    expect(screen.getByRole("link", { name: /teacher groups/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /^users$/i })).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not mark anything active outside the admin section", () => {
     pathnameMock.mockReturnValue("/teacher");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: {} }) }));
     render(<AdminSidebar />);
     expect(screen.getByRole("link", { name: /^users$/i })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("link", { name: /teacher groups/i })).not.toHaveAttribute("aria-current");
   });
 });
