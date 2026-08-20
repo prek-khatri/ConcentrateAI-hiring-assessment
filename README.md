@@ -27,18 +27,21 @@ See `PLANNING.md` for the team task split.
 
 <table>
   <tr>
-    <td align="center" width="33%">
+    <td align="center" width="50%">
       <img width="100%" alt="Caption" src="https://github.com/user-attachments/assets/6312371b-0572-433c-92ac-f3adb261c4c6" /><br/>
       <sub><b>Caption</b></sub>
     </td>
-    <td align="center" width="33%">
+    <td align="center" width="50%">
       <img width="100%" alt="Caption" src="https://github.com/user-attachments/assets/91b00444-9b1f-497d-b199-306eed704fbe" /><br/>
       <sub><b>Caption</b></sub>
     </td>
-    <td align="center" width="33%">
+  </tr>
+  <tr>
+    <td align="center" width="50%">
       <img width="100%" alt="Caption" src="https://github.com/user-attachments/assets/ad5c5900-2318-41b7-9085-8f1d7eee3e64" /><br/>
       <sub><b>Caption</b></sub>
     </td>
+    <td></td>
   </tr>
 </table>
 
@@ -46,19 +49,21 @@ See `PLANNING.md` for the team task split.
 
 <table>
   <tr>
-    <td align="center" width="25%">
+    <td align="center" width="50%">
       <img width="100%" alt="Caption" src="https://github.com/user-attachments/assets/44026d3d-f746-474f-899d-d2ce8b395968" /><br/>
       <sub><b>Caption</b></sub>
     </td>
-    <td align="center" width="25%">
+    <td align="center" width="50%">
       <img width="100%" alt="Caption" src="https://github.com/user-attachments/assets/8dda497a-8f2a-43e0-a387-54628593c6e4" /><br/>
       <sub><b>Caption</b></sub>
     </td>
-    <td align="center" width="25%">
+  </tr>
+  <tr>
+    <td align="center" width="50%">
       <img width="100%" alt="Caption" src="https://github.com/user-attachments/assets/5b1d65f5-a951-4a42-9748-7fe38494ae8b" /><br/>
       <sub><b>Caption</b></sub>
     </td>
-    <td align="center" width="25%">
+    <td align="center" width="50%">
       <img width="100%" alt="Caption" src="https://github.com/user-attachments/assets/9523cc54-06a6-46dc-a659-ab9d73276127" /><br/>
       <sub><b>Caption</b></sub>
     </td>
