@@ -4,6 +4,13 @@ export default defineConfig({
   test: {
     environment: "node",
     fileParallelism: false, // integration tests share one real Postgres instance and seed users
+    env: {
+      DATABASE_URL: process.env.DATABASE_URL || "postgresql://school:school@localhost:5432/school_portal",
+      REDIS_URL: process.env.REDIS_URL || "redis://localhost:6379",
+      JWT_SECRET: process.env.JWT_SECRET || "01234567890123456789012345678901",
+      GROQ_API_KEY: process.env.GROQ_API_KEY || "test-groq-key-placeholder",
+      NODE_ENV: "test",
+    },
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
