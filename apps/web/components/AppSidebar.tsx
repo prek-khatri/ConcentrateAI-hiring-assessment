@@ -84,25 +84,26 @@ export function AppSidebar({
         {footer}
       </nav>
 
-      <div className="flex items-center gap-2.5 border-t border-white/10 px-4 py-3.5">
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white">
-          {user ? initials(user.name) : ""}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-medium text-white">{user?.name}</p>
-          <p className="truncate text-[11px] capitalize text-sidebar-muted">{user?.role}</p>
+      <div className="flex flex-col gap-2.5 border-t border-white/10 px-3 py-3.5">
+        <div className="flex items-center gap-2.5 px-1.5">
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-white">
+            {user ? initials(user.name) : ""}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium text-white">{user?.name}</p>
+            <p className="truncate text-[11px] capitalize text-sidebar-muted">{user?.role}</p>
+          </div>
         </div>
         <button
           onClick={handleLogout}
-          aria-label="Sign out"
-          title="Sign out"
-          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-sidebar-muted transition-colors hover:bg-white/10 hover:text-white"
+          className="flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-sidebar-text transition-colors hover:bg-sidebar-active/60 hover:text-white"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <path d="M16 17l5-5-5-5" />
             <path d="M21 12H9" />
           </svg>
+          Sign out
         </button>
       </div>
       {logoutError ? (
